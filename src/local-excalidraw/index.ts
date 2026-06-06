@@ -2,6 +2,7 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as ExcalidrawLib from "@excalidraw/excalidraw";
+import "@excalidraw/excalidraw/index.css";
 import "./style.css";
 import svgElementToString from '../util/svgElementToString'
 

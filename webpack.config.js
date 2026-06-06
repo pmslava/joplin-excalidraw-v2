@@ -174,9 +174,10 @@ const pluginConfig = Object.assign({}, baseConfig, {
 		new CopyPlugin({
 			patterns: [
 				{
-					from: path.resolve(__dirname, "node_modules/@excalidraw/excalidraw/dist/excalidraw-assets"),
-					// correct path is provided via 'window.EXCALIDRAW_ASSET_PATH'
-					to: path.resolve(__dirname, "dist/excalidraw-assets")
+					// Excalidraw 0.18 ships fonts under dist/prod/fonts; the editor iframe
+					// resolves them via 'window.EXCALIDRAW_ASSET_PATH' (set to "../") -> dist/fonts.
+					from: path.resolve(__dirname, "node_modules/@excalidraw/excalidraw/dist/prod/fonts"),
+					to: path.resolve(__dirname, "dist/fonts")
 				}
 			]
     	}),

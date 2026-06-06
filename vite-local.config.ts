@@ -4,7 +4,13 @@ import { defineConfig } from "vite";
 export default defineConfig({
   root: resolve(__dirname, "src/local-excalidraw"),
   base: './',
+  optimizeDeps: {
+    esbuildOptions: {
+      target: "esnext",
+    },
+  },
   build: {
+    target: "esnext",
     chunkSizeWarningLimit: 3000,
     outDir: resolve(__dirname, "dist/local-excalidraw"),
     rollupOptions: {
