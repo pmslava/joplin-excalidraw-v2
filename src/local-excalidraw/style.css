@@ -1,6 +1,13 @@
+html,
+body,
+#app,
+.container {
+    height: 100%;
+    margin: 0;
+  }
+
 .container {
     font-family: sans-serif;
-    text-align: center;
   }
   
   .button-wrapper button {
@@ -16,7 +23,7 @@
   }
   
   .excalidraw-wrapper {
-    height: 700px;
+    height: 100%;
     margin: 0px;
     position: relative;
   }
