@@ -8,11 +8,35 @@ const Config = {
   ContentScriptId: 'excalidraw-script',
 }
 
-const buildDialogHTML = (diagramBody: string): string => {
+type JoplinThemePref = 'light' | 'dark' | 'auto';
+
+// Joplin's built-in dark theme ids (see @joplin/lib/theme). Known light ids are
+// resolved directly; anything unknown (e.g. auto-detect, custom themes) is left
+// to the editor, which detects light/dark from the dialog's actual colours.
+const DARK_THEME_IDS = new Set([2, 4, 5, 6, 7, 22]);
+const LIGHT_THEME_IDS = new Set([1, 3]);
+
+const joplinThemePref = async (): Promise<JoplinThemePref> => {
+  try {
+    if (await joplin.settings.globalValue('themeAutoDetect')) return 'auto';
+    const themeId = Number(await joplin.settings.globalValue('theme'));
+    if (DARK_THEME_IDS.has(themeId)) return 'dark';
+    if (LIGHT_THEME_IDS.has(themeId)) return 'light';
+  } catch (error) {
+    console.warn('excalidraw: could not read the Joplin theme:', error);
+  }
+  return 'auto';
+}
+
+const escapeAttribute = (value: string): string =>
+  value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
+const buildDialogHTML = (diagramBody: string, theme: JoplinThemePref): string => {
   return `
 		<form name="main" style="display:none">
-			<input type="hidden" name="excalidraw_diagram_json" id="excalidraw_diagram_json" value='${diagramBody}'>
-			<input type="hidden" name="excalidraw_diagram_svg" id="excalidraw_diagram_svg" value=''>
+			<input type="hidden" name="excalidraw_diagram_json" id="excalidraw_diagram_json" value="${escapeAttribute(diagramBody)}">
+			<input type="hidden" name="excalidraw_diagram_svg" id="excalidraw_diagram_svg" value="">
+			<input type="hidden" name="excalidraw_theme" id="excalidraw_theme" value="${theme}">
 		</form>
 		`
 }
@@ -24,6 +48,7 @@ function diagramMarkdown(diagramId: string) {
 const openDialog = async (svgResourceId: string = null): Promise<string | null> => {
   let diagramBody = "{}";
   const appPath = await joplin.plugins.installationDir();
+  const theme = await joplinThemePref();
 
   const isNewDiagram = (svgResourceId === null);
   if (!isNewDiagram) {
@@ -34,7 +59,7 @@ const openDialog = async (svgResourceId: string = null): Promise<string | null> 
   let dialogs = joplin.views.dialogs;
   let dialogHandle = await dialogs.create(`excalidraw-dialog-${uuidv4()}`);
 
-  let header = buildDialogHTML(diagramBody);
+  let header = buildDialogHTML(diagramBody, theme);
   let iframe = `<iframe id="excalidraw_iframe" style="position:absolute;border:0;width:100%;height:100%;" src="${appPath}/local-excalidraw/index.html" title="Excalidraw frame"></iframe>`
 
   await dialogs.setHtml(dialogHandle, header + iframe);

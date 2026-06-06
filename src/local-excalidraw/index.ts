@@ -11,13 +11,53 @@ import svgElementToString from '../util/svgElementToString'
 const parentInput = (id: string): HTMLInputElement | null =>
   window.parent.document.getElementById(id) as HTMLInputElement | null;
 
-const readInitialData = (): any => {
+type Theme = 'light' | 'dark';
+
+// Luminance of a CSS rgb/rgba colour, or null when it carries no real colour
+// (unparseable, or fully transparent).
+const backgroundLuminance = (color: string): number | null => {
+  const match = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+))?\)/i.exec(color);
+  if (!match || match[4] === '0') return null;
+  const [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+};
+
+// Used when the plugin couldn't resolve Joplin's theme from settings (the
+// "auto-detect" option, or a custom theme): read the dialog's real colours.
+const detectJoplinTheme = (): Theme => {
   try {
-    return JSON.parse(parentInput('excalidraw_diagram_json')!.value);
+    const parent = window.parent;
+    for (const el of [parent.document.body, parent.document.documentElement]) {
+      const luminance = backgroundLuminance(parent.getComputedStyle(el).backgroundColor);
+      if (luminance !== null) return luminance < 0.5 ? 'dark' : 'light';
+    }
+  } catch (error) {
+    console.warn('excalidraw: could not detect the Joplin theme:', error);
+  }
+  if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
+  return 'light';
+};
+
+const initialTheme = (): Theme => {
+  const pref = parentInput('excalidraw_theme')?.value;
+  return pref === 'light' || pref === 'dark' ? pref : detectJoplinTheme();
+};
+
+const readInitialData = (): any => {
+  let data: any = {};
+  try {
+    data = JSON.parse(parentInput('excalidraw_diagram_json')!.value);
   } catch (error) {
     console.error("excalidraw: could not parse the initial diagram:", error);
-    return {};
   }
+  // New drawings open in Joplin's theme; existing drawings keep the theme they
+  // were saved with (we persist it ourselves in writeJson, below, because
+  // Excalidraw drops appState.theme when it exports JSON).
+  data.appState = data.appState ?? {};
+  if (data.appState.theme !== 'light' && data.appState.theme !== 'dark') {
+    data.appState.theme = initialTheme();
+  }
+  return data;
 };
 
 const InitialData = readInitialData();
@@ -32,9 +72,14 @@ const App = () => {
     const api = apiRef.current;
     const input = parentInput('excalidraw_diagram_json');
     if (!api || !input) return;
-    input.value = ExcalidrawLib.serializeAsJSON(
+    const json = JSON.parse(ExcalidrawLib.serializeAsJSON(
       api.getSceneElements(), api.getAppState(), api.getFiles(), "local",
-    );
+    ));
+    // Excalidraw omits the theme from exported JSON, so store it ourselves to
+    // reopen the drawing with the same theme next time.
+    json.appState = json.appState ?? {};
+    json.appState.theme = api.getAppState().theme;
+    input.value = JSON.stringify(json);
   }, []);
 
   // Exporting to SVG is async and comparatively expensive.
@@ -42,9 +87,16 @@ const App = () => {
     const api = apiRef.current;
     const input = parentInput('excalidraw_diagram_svg');
     if (!api || !input) return;
+    const appState = api.getAppState();
     const svg = await ExcalidrawLib.exportToSvg({
       elements: api.getSceneElements(),
-      appState: api.getAppState(),
+      appState: {
+        ...appState,
+        exportBackground: true,
+        // Export in the drawing's own theme so the SVG matches what was drawn
+        // (dark drawings get Excalidraw's invert filter on the root <svg>).
+        exportWithDarkMode: appState.theme === 'dark',
+      },
       files: api.getFiles(),
     });
     input.value = svgElementToString(svg);
@@ -115,6 +167,7 @@ const App = () => {
       },
         React.createElement(
           ExcalidrawLib.MainMenu, null,
+          React.createElement(ExcalidrawLib.MainMenu.DefaultItems.ToggleTheme),
           React.createElement(ExcalidrawLib.MainMenu.DefaultItems.ChangeCanvasBackground),
         ),
       ),
