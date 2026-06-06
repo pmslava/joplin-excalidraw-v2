@@ -1,7 +1,7 @@
 import joplin from 'api'
 import { v4 as uuidv4 } from 'uuid';
 
-import { ContentScriptType, ToolbarButtonLocation } from 'api/types'
+import { ContentScriptType, MenuItemLocation, ToolbarButtonLocation } from 'api/types'
 import { createDiagramResource, getDiagramResource, updateDiagramResource, clearDiskCache, duplicateV1DiagramAsV2, generateId } from './resources';
 
 const Config = {
@@ -87,6 +87,35 @@ const openDialog = async (svgResourceId: string = null): Promise<string | null> 
   return svgResourceId;
 }
 
+// Resource ids of v2 Excalidraw drawings (![excalidraw.svg](:/id)) in some text.
+const excalidrawSvgIds = (text: string): string[] => {
+  const ids: string[] = [];
+  const regex = /!\[excalidraw\.svg\]\(:\/([a-zA-Z0-9]+)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text ?? '')) !== null) ids.push(match[1]);
+  return ids;
+}
+
+// Resolve which drawing the "Edit Excalidraw drawing" command should open,
+// using the current selection first and the whole note as a fallback. This is
+// editor-agnostic (works in both the Markdown and rich text editors).
+const findExcalidrawForEditing = async (): Promise<string | null> => {
+  const selection = await joplin.commands.execute('selectedText').catch(() => '');
+  const inSelection = excalidrawSvgIds(typeof selection === 'string' ? selection : '');
+  if (inSelection.length === 1) return inSelection[0];
+
+  const note = await joplin.workspace.selectedNote();
+  const inNote = excalidrawSvgIds(note?.body ?? '');
+  if (inNote.length === 1) return inNote[0];
+
+  await joplin.views.dialogs.showMessageBox(
+    inNote.length === 0
+      ? 'No Excalidraw drawing was found in this note.'
+      : 'This note has several Excalidraw drawings. Select the one you want to edit, then run the command again.'
+  );
+  return null;
+}
+
 joplin.plugins.register({
   onStart: async () => {
 
@@ -154,7 +183,7 @@ joplin.plugins.register({
 
     await joplin.commands.register({
       name: 'addExcalidraw',
-      label: 'add excalidraw panel',
+      label: 'Add Excalidraw drawing',
       iconName: 'icon-excalidraw-plus-icon-filled',
       execute: async () => {
         // return as promise
@@ -162,6 +191,22 @@ joplin.plugins.register({
       }
     });
 
+    await joplin.commands.register({
+      name: 'editExcalidraw',
+      label: 'Edit Excalidraw drawing',
+      iconName: 'icon-excalidraw-plus-icon-filled',
+      execute: async () => {
+        const svgResourceId = await findExcalidrawForEditing();
+        return svgResourceId ? openDialog(svgResourceId) : null;
+      }
+    });
+
     await joplin.views.toolbarButtons.create('addExcalidraw', 'addExcalidraw', ToolbarButtonLocation.EditorToolbar);
+
+    // Allow editing a drawing straight from the editor, not just from the
+    // preview pane's edit button.
+    await joplin.views.menuItems.create('editExcalidrawContextMenu', 'editExcalidraw', MenuItemLocation.EditorContextMenu);
+    await joplin.views.menuItems.create('addExcalidrawToolsMenu', 'addExcalidraw', MenuItemLocation.Tools);
+    await joplin.views.menuItems.create('editExcalidrawToolsMenu', 'editExcalidraw', MenuItemLocation.Tools);
   },
 })
