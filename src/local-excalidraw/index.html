@@ -4,7 +4,11 @@
     <title>Excalidraw in browser</title>
     <meta charset="UTF-8" />
     <script>
-      window.EXCALIDRAW_ASSET_PATH = "../";
+      // Excalidraw 0.18 resolves asset URLs with `new URL(path, EXCALIDRAW_ASSET_PATH)`,
+      // which requires an absolute base. A relative "../" throws "Invalid base URL" and
+      // breaks font loading, text editing and SVG export. Resolve the dist/ folder
+      // (which holds fonts/) to an absolute URL at runtime.
+      window.EXCALIDRAW_ASSET_PATH = new URL("..", document.location.href).href;
     </script>
   </head>
 
