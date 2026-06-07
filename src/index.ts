@@ -1,11 +1,15 @@
 import joplin from 'api'
 import { v4 as uuidv4 } from 'uuid';
 
-import { ContentScriptType, MenuItemLocation, ToolbarButtonLocation } from 'api/types'
+import { ContentScriptType, MenuItemLocation, SettingItemType, ToolbarButtonLocation } from 'api/types'
 import { createDiagramResource, getDiagramResource, updateDiagramResource, clearDiskCache, duplicateV1DiagramAsV2, generateId } from './resources';
 
 const Config = {
   ContentScriptId: 'excalidraw-script',
+  CodeMirrorScriptId: 'excalidraw-codemirror',
+  SettingsSection: 'excalidraw',
+  NewThemeSetting: 'newDrawingTheme',
+  PreserveThemeSetting: 'preserveDrawingTheme',
 }
 
 type JoplinThemePref = 'light' | 'dark' | 'auto';
@@ -28,15 +32,63 @@ const joplinThemePref = async (): Promise<JoplinThemePref> => {
   return 'auto';
 }
 
+const registerSettings = async (): Promise<void> => {
+  await joplin.settings.registerSection(Config.SettingsSection, {
+    label: 'Excalidraw',
+    iconName: 'fas fa-pencil-alt',
+  });
+
+  await joplin.settings.registerSettings({
+    [Config.NewThemeSetting]: {
+      value: 'joplin',
+      type: SettingItemType.String,
+      section: Config.SettingsSection,
+      public: true,
+      isEnum: true,
+      options: { joplin: 'Follow Joplin theme', light: 'Light', dark: 'Dark' },
+      label: 'Theme for new drawings',
+    },
+    [Config.PreserveThemeSetting]: {
+      value: true,
+      type: SettingItemType.Bool,
+      section: Config.SettingsSection,
+      public: true,
+      label: "Keep each drawing's saved theme",
+      description: 'When off, existing drawings also open using the "Theme for new drawings" setting.',
+    },
+  });
+}
+
+// Theme to open a NEW drawing with: an explicit Light/Dark choice, otherwise
+// whatever Joplin is currently using.
+const newDrawingThemePref = async (): Promise<JoplinThemePref> => {
+  try {
+    const setting = await joplin.settings.value(Config.NewThemeSetting);
+    if (setting === 'light' || setting === 'dark') return setting;
+  } catch (error) {
+    console.warn('excalidraw: could not read the theme setting:', error);
+  }
+  return joplinThemePref();
+}
+
+const preserveDrawingTheme = async (): Promise<boolean> => {
+  try {
+    return (await joplin.settings.value(Config.PreserveThemeSetting)) !== false;
+  } catch (error) {
+    return true;
+  }
+}
+
 const escapeAttribute = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
-const buildDialogHTML = (diagramBody: string, theme: JoplinThemePref): string => {
+const buildDialogHTML = (diagramBody: string, theme: JoplinThemePref, preserveTheme: boolean): string => {
   return `
 		<form name="main" style="display:none">
 			<input type="hidden" name="excalidraw_diagram_json" id="excalidraw_diagram_json" value="${escapeAttribute(diagramBody)}">
 			<input type="hidden" name="excalidraw_diagram_svg" id="excalidraw_diagram_svg" value="">
 			<input type="hidden" name="excalidraw_theme" id="excalidraw_theme" value="${theme}">
+			<input type="hidden" name="excalidraw_preserve_theme" id="excalidraw_preserve_theme" value="${preserveTheme}">
 		</form>
 		`
 }
@@ -48,7 +100,8 @@ function diagramMarkdown(diagramId: string) {
 const openDialog = async (svgResourceId: string = null): Promise<string | null> => {
   let diagramBody = "{}";
   const appPath = await joplin.plugins.installationDir();
-  const theme = await joplinThemePref();
+  const theme = await newDrawingThemePref();
+  const preserveTheme = await preserveDrawingTheme();
 
   const isNewDiagram = (svgResourceId === null);
   if (!isNewDiagram) {
@@ -59,7 +112,7 @@ const openDialog = async (svgResourceId: string = null): Promise<string | null> 
   let dialogs = joplin.views.dialogs;
   let dialogHandle = await dialogs.create(`excalidraw-dialog-${uuidv4()}`);
 
-  let header = buildDialogHTML(diagramBody, theme);
+  let header = buildDialogHTML(diagramBody, theme, preserveTheme);
   let iframe = `<iframe id="excalidraw_iframe" style="position:absolute;border:0;width:100%;height:100%;" src="${appPath}/local-excalidraw/index.html" title="Excalidraw frame"></iframe>`
 
   await dialogs.setHtml(dialogHandle, header + iframe);
@@ -81,10 +134,26 @@ const openDialog = async (svgResourceId: string = null): Promise<string | null> 
       let diagramJson = dialogResult.formData.main.excalidraw_diagram_json;
       let diagramSvg = dialogResult.formData.main.excalidraw_diagram_svg;
       await updateDiagramResource(svgResourceId, diagramJson, diagramSvg)
+      await refreshDrawingImage(svgResourceId);
     }
   }
 
   return svgResourceId;
+}
+
+// After updating the resource the already-rendered <img> still points at the
+// old content, and Joplin won't reload a note that's open in the editor. Bust
+// the image's cachebreaker (via the CodeMirror content script) so the new SVG
+// appears in the editor's inline render without reopening the note.
+const refreshDrawingImage = async (svgResourceId: string): Promise<void> => {
+  try {
+    await joplin.commands.execute('editor.execCommand', {
+      name: 'excalidrawRefreshImage',
+      args: [svgResourceId],
+    });
+  } catch (error) {
+    console.warn('excalidraw: could not refresh the drawing image:', error);
+  }
 }
 
 // Resource ids of v2 Excalidraw drawings (![excalidraw.svg](:/id)) in some text.
@@ -96,10 +165,23 @@ const excalidrawSvgIds = (text: string): string[] => {
   return ids;
 }
 
-// Resolve which drawing the "Edit Excalidraw drawing" command should open,
-// using the current selection first and the whole note as a fallback. This is
-// editor-agnostic (works in both the Markdown and rich text editors).
+// Text of the editor's current line, via the CodeMirror content script.
+const editorCurrentLine = async (): Promise<string> => {
+  try {
+    const line = await joplin.commands.execute('editor.execCommand', { name: 'excalidrawCurrentLine' });
+    return typeof line === 'string' ? line : '';
+  } catch (error) {
+    return '';
+  }
+}
+
+// Resolve which drawing the "Edit Excalidraw drawing" command should open: the
+// drawing on the cursor's current line first, then the selection, then the
+// note's only drawing.
 const findExcalidrawForEditing = async (): Promise<string | null> => {
+  const onLine = excalidrawSvgIds(await editorCurrentLine());
+  if (onLine.length >= 1) return onLine[0];
+
   const selection = await joplin.commands.execute('selectedText').catch(() => '');
   const inSelection = excalidrawSvgIds(typeof selection === 'string' ? selection : '');
   if (inSelection.length === 1) return inSelection[0];
@@ -111,7 +193,7 @@ const findExcalidrawForEditing = async (): Promise<string | null> => {
   await joplin.views.dialogs.showMessageBox(
     inNote.length === 0
       ? 'No Excalidraw drawing was found in this note.'
-      : 'This note has several Excalidraw drawings. Select the one you want to edit, then run the command again.'
+      : 'Put the cursor on the line of the Excalidraw drawing you want to edit, then run the command again.'
   );
   return null;
 }
@@ -120,6 +202,7 @@ joplin.plugins.register({
   onStart: async () => {
 
     clearDiskCache();
+    await registerSettings();
 
     const installDir = await joplin.plugins.installationDir();
     const excalidrawCssFilePath = installDir + '/excalidraw.css';
@@ -130,6 +213,14 @@ joplin.plugins.register({
       ContentScriptType.MarkdownItPlugin,
       Config.ContentScriptId,
       './contentScripts/markdownIt.js',
+    );
+
+    // exposes the editor's current line, so "Edit Excalidraw drawing" can act on
+    // the line the cursor is on without it having to be selected
+    await joplin.contentScripts.register(
+      ContentScriptType.CodeMirrorPlugin,
+      Config.CodeMirrorScriptId,
+      './contentScripts/codeMirror.js',
     );
 
     // this is the main message processing function
@@ -203,10 +294,22 @@ joplin.plugins.register({
 
     await joplin.views.toolbarButtons.create('addExcalidraw', 'addExcalidraw', ToolbarButtonLocation.EditorToolbar);
 
-    // Allow editing a drawing straight from the editor, not just from the
-    // preview pane's edit button.
-    await joplin.views.menuItems.create('editExcalidrawContextMenu', 'editExcalidraw', MenuItemLocation.EditorContextMenu);
-    await joplin.views.menuItems.create('addExcalidrawToolsMenu', 'addExcalidraw', MenuItemLocation.Tools);
-    await joplin.views.menuItems.create('editExcalidrawToolsMenu', 'editExcalidraw', MenuItemLocation.Tools);
+    // Group both commands under a single Tools > Excalidraw submenu.
+    await joplin.views.menus.create('excalidrawMenu', 'Excalidraw', [
+      { commandName: 'addExcalidraw' },
+      { commandName: 'editExcalidraw' },
+    ], MenuItemLocation.Tools);
+
+    // Offer "Edit Excalidraw drawing" in the editor's right-click menu, but only
+    // when the cursor's current line actually holds a drawing.
+    joplin.workspace.filterEditorContextMenu(async (contextMenu: any) => {
+      if (excalidrawSvgIds(await editorCurrentLine()).length > 0) {
+        contextMenu.items.push(
+          { type: 'separator' },
+          { commandName: 'editExcalidraw', label: 'Edit Excalidraw drawing' },
+        );
+      }
+      return contextMenu;
+    });
   },
 })

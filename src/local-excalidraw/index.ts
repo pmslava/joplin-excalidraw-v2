@@ -38,10 +38,14 @@ const detectJoplinTheme = (): Theme => {
   return 'light';
 };
 
-const initialTheme = (): Theme => {
+// Theme for a new drawing: the configured Light/Dark choice, or Joplin's theme.
+const newDrawingTheme = (): Theme => {
   const pref = parentInput('excalidraw_theme')?.value;
   return pref === 'light' || pref === 'dark' ? pref : detectJoplinTheme();
 };
+
+const preserveSavedTheme = (): boolean =>
+  parentInput('excalidraw_preserve_theme')?.value !== 'false';
 
 const readInitialData = (): any => {
   let data: any = {};
@@ -50,12 +54,15 @@ const readInitialData = (): any => {
   } catch (error) {
     console.error("excalidraw: could not parse the initial diagram:", error);
   }
-  // New drawings open in Joplin's theme; existing drawings keep the theme they
-  // were saved with (we persist it ourselves in writeJson, below, because
-  // Excalidraw drops appState.theme when it exports JSON).
+  // Existing drawings reopen with the theme they were saved with (we persist it
+  // in writeJson, since Excalidraw drops appState.theme on export) — unless the
+  // user disabled that, in which case they, like new drawings, use the
+  // configured new-drawing theme.
   data.appState = data.appState ?? {};
-  if (data.appState.theme !== 'light' && data.appState.theme !== 'dark') {
-    data.appState.theme = initialTheme();
+  const saved = data.appState.theme;
+  const keepSaved = preserveSavedTheme() && (saved === 'light' || saved === 'dark');
+  if (!keepSaved) {
+    data.appState.theme = newDrawingTheme();
   }
   return data;
 };
