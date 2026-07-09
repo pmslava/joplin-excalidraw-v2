@@ -1,27 +1,31 @@
 /* Reference: https://github.com/personalizedrefrigerator/joplin-plugin-freehand-drawing/blob/main/src/contentScripts/markdownIt.css */
-.excalidraw--editButton {
-	display: none;
-	width: min-content;
-	max-height: 50px;
+
+/*
+ * The Edit / Convert button floats over the drawing's corner. It sits in a
+ * container that is a *sibling* of the <img> -- the image itself is never
+ * wrapped or moved, so a right-click still lands on the <img> and Joplin's
+ * "Copy image" context-menu action keeps working. The button is positioned
+ * over the image in markdownIt-content.js.
+ */
+.excalidraw--editButtonContainer {
+	display: inline-block;
+	position: relative;
+	opacity: 0;
+	overflow: hidden;
 	z-index: 1;
+	transition: opacity 0.2s ease;
+}
+
+.excalidraw--editButtonContainer.-show,
+.excalidraw--editButtonContainer:hover,
+.excalidraw--editButtonContainer:focus-within {
 	opacity: 0.9;
-
-	align-self: flex-end;
-	justify-self: right;
+	overflow: visible;
 }
 
-.excalidraw--svgWrapper {
-	display: inline-grid;
-}
-
-.excalidraw--svgWrapper > * {
-	grid-row: 1;
-	grid-column: 1;
-}
-
-.excalidraw--svgWrapper:hover .excalidraw--editButton,
-.excalidraw--svgWrapper:focus .excalidraw--editButton,
-.excalidraw--svgWrapper:focus-within .excalidraw--editButton,
-.excalidraw--editButton:focus {
-	display: block;
+.excalidraw--editButton {
+	position: absolute;
+	width: max-content;
+	max-height: 50px;
+	white-space: nowrap;
 }
