@@ -24,7 +24,11 @@ First release as **Excalidraw** (`io.github.pmslava.excalidraw`), the continuati
   Copy as Excalidraw -- replacing the single "Edit" button, in Joplin's own theme colours
 - Tools > Excalidraw submenu grouping every command
 - Edit a drawing from the Markdown editor: right-click menu and the cursor's current line
-- Drawings refresh in place after saving, instead of showing a stale preview
+- Drawings refresh in place after saving, instead of showing a stale preview, and stay visible
+  in every window: a drawing saved from a second window no longer leaves a broken image in the
+  first window's Markdown editor (a resource's file is briefly renamed away while Joplin
+  rewrites it, and `editor.execCommand` only ever reaches the focused window's editor). The
+  image retries itself, and each window catches up when it regains focus
 - Edit button now works in the Rich Text editor
 - "Mermaid to Excalidraw" works again: opening it no longer crashes the editor (upstream #3)
 - New plugin id and renamed internal identifiers (content scripts, commands, CSS classes, temp

@@ -60,7 +60,9 @@
   - *Keep each drawing's saved theme* — on by default. When off, existing drawings also open
     using the *Theme for new drawings* setting.
 - Saving a drawing refreshes its image in place, so you see the new version without reopening
-  the note.
+  the note — in **every** window. A window that was not the one you saved from catches up as
+  soon as you click back into it, and an image that happened to load while Joplin was rewriting
+  the drawing's file retries itself instead of staying a broken icon.
 
 ## How drawings are stored
 
