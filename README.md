@@ -138,10 +138,11 @@ by neagix, which is no longer maintained (last commit October 2025), itself a fo
 [`joplin-excalidraw`](https://github.com/artikell/joplin-excalidraw) by artikell.
 
 > [!IMPORTANT]
-> **Uninstall the old plugin first.** With both installed you get two sets of buttons on every
-> drawing, two pencil buttons on the toolbar and two Tools → Excalidraw submenus — and because
-> Joplin does not namespace content-script ids, an Edit click can be handled by the *other*
-> plugin's editor.
+> **Disable or uninstall the old plugin first.** Your drawings are ordinary note attachments,
+> not something a plugin owns, so disabling or removing a plugin never touches them. With both
+> plugins enabled you get two sets of buttons on every drawing, two pencil buttons on the toolbar
+> and two Tools → Excalidraw submenus — and because Joplin does not namespace content-script
+> ids, an Edit click can be handled by the *other* plugin's editor.
 
 - **Your existing drawings keep working.** Both the `![excalidraw.svg](:/id)` links and the
   `excalidraw-<id>.json` / `.svg` resource pairs are read unchanged. Nothing is converted or
