@@ -10,5 +10,15 @@
 	"repository_url": "https://github.com/pmslava/joplin-plugin-excalidraw",
 	"keywords": ["excalidraw", "drawing", "sketch", "diagram", "whiteboard", "svg"],
 	"categories": ["editor", "integrations"],
-	"platforms": ["desktop"]
+	"platforms": ["desktop"],
+	"screenshots": [
+		{
+			"src": "docs/images/editor-full-size.png",
+			"label": "The editor at full size, with Save, Close and the size toggle in the bottom-right corner"
+		},
+		{
+			"src": "docs/images/viewer-toolbar.png",
+			"label": "The hover toolbar on a drawing in the note viewer"
+		}
+	]
 }
