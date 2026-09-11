@@ -5,7 +5,7 @@
   "author": "pmslava",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pmslava/joplin-plugin-excalidraw"
+    "url": "git+https://github.com/pmslava/joplin-plugin-excalidraw.git"
   },
   "scripts": {
     "dist:webview": "vite build --config vite-webview.config.ts --emptyOutDir",
