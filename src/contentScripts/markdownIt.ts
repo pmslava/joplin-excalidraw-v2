@@ -4,7 +4,7 @@ import type Renderer = require('markdown-it/lib/renderer');
 import type Token = require('markdown-it/lib/token');
 
 // The interactive hover toolbar (Edit, Edit in a new window, Copy as image, Copy
-// as Excalidraw) and the legacy "Convert to v2" button are attached at view time
+// as JSON) and the legacy "Convert to v2" button are attached at view time
 // by the companion asset (markdownIt-content.js) using addEventListener -- NOT
 // via inline on* handlers, which the Rich Text Editor's Content-Security-Policy
 // blocks (laurent22/joplin#12106). This renderer therefore only *tags* the

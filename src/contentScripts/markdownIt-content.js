@@ -14,7 +14,7 @@
 //                                                                                    (Edit, Edit in new
 //                                                                                     window, Copy as
 //                                                                                     image, Copy as
-//                                                                                     Excalidraw)
+//                                                                                     JSON)
 //   - legacy v1 diagrams: <img class="excalidraw-plugin--convertible"
 //                              data-excalidraw-plugin-diagram-id="..." ...>        -> "Convert to v2"
 //
@@ -111,10 +111,11 @@
 		if (image) sendWithPrefix('excalidraw_copy_image_', image, 'copying as an image');
 	}
 
-	// v2: put the drawing on the clipboard as Excalidraw elements.
+	// v2: put the drawing on the clipboard as Excalidraw's own JSON clipboard
+	// format, whose elements paste back as real, editable shapes.
 	function onCopyExcalidraw(arg) {
 		var image = resolveImage(arg);
-		if (image) sendWithPrefix('excalidraw_copy_excalidraw_', image, 'copying as Excalidraw');
+		if (image) sendWithPrefix('excalidraw_copy_excalidraw_', image, 'copying as JSON');
 	}
 
 	// v1: convert a legacy diagram to v2. The note update refreshes the preview.
@@ -175,7 +176,7 @@
 		{ title: 'Edit drawing', icon: ICON_EDIT, handler: onEdit },
 		{ title: 'Edit drawing in a new window', icon: ICON_NEW_WINDOW, handler: onEditInNewWindow },
 		{ title: 'Copy drawing as image', icon: ICON_IMAGE, handler: onCopyImage },
-		{ title: 'Copy drawing as Excalidraw', icon: ICON_EXCALIDRAW, handler: onCopyExcalidraw },
+		{ title: 'Copy as JSON', icon: ICON_EXCALIDRAW, handler: onCopyExcalidraw },
 	];
 
 	// Legacy v1 diagrams get the same island, holding one text button.

@@ -190,3 +190,59 @@ body,
         font-size: 0.8125rem;
     }
 }
+
+/* ---------------------------------------------------------------------------
+   Narrow dialogs: keep Excalidraw's own chrome inside the editor
+
+   Joplin's plugin dialog is 90 vw, so on a 1330 px window with the interface
+   zoomed the editor is only a few hundred CSS pixels wider than Excalidraw's
+   mobile breakpoint (730 px) — and between 730 px and ~768 px its top row does
+   not fit.
+
+   .App-menu_top is a `1fr 2fr 1fr` grid with 2rem gaps, and grid items never
+   shrink below their min-content, so the row's real minimum is
+   40 px (hamburger) + 32 + 550 px (toolbar) + 32 + 82 px (Library button)
+   = 736 px, against an available width of `editor - 2rem`. Below a ~768 px
+   editor the grid overflows to the right and the Library button — the last
+   column, justify-self: flex-end — is cut off by the dialog's edge. Measured
+   in the layout harness: at a 738 px editor the button ran from 666 px to
+   748 px, i.e. 10 px past the right edge.
+
+   Nothing here is !important and nothing is restyled above the breakpoints:
+   the button only loses its text label, the way Excalidraw itself drops it in
+   its mobile layout (.excalidraw--mobile .default-sidebar-trigger
+   .sidebar-trigger__label { display: none }). Same-specificity selectors win
+   on source order, since index.ts imports this file after Excalidraw's CSS.
+   --------------------------------------------------------------------------- */
+
+/* Below ~1100 px the Library button goes icon-only. `title="Library"` on the
+   wrapping <label> keeps the tooltip, and the <input> keeps its aria-label, so
+   nothing is lost to a screen reader. This alone takes the row's minimum from
+   736 px to ~694 px, i.e. below Excalidraw's own 730 px mobile breakpoint. */
+@media (max-width: 1100px) {
+    .excalidraw .default-sidebar-trigger .sidebar-trigger__label {
+        display: none;
+    }
+}
+
+/* Below ~1000 px the little "1", "2", "3"… hints in the toolbar go too: they
+   are the first thing to become unreadable clutter once the row is tight.
+   (They are absolutely positioned, so this is about legibility, not width.) */
+@media (max-width: 1000px) {
+    .excalidraw .ToolIcon__keybinding {
+        display: none;
+    }
+}
+
+/* Below 900 px, buy the last pixels from the gutters rather than from the
+   controls: halve the top row's 2rem grid gaps. Together with the icon-only
+   Library button this brings the row's minimum to about 694 px, so it still
+   fits at 731 px — the narrowest desktop layout Excalidraw uses before it
+   switches to its mobile one. Only .App-menu_top is touched, which does not
+   exist in the mobile layout, so the bottom bar the action island measures
+   itself against is unchanged. */
+@media (max-width: 900px) {
+    .excalidraw .App-menu_top {
+        grid-gap: 1rem;
+    }
+}

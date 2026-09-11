@@ -350,10 +350,10 @@ const copyDrawingAsExcalidraw = async (svgResourceId: string): Promise<void> => 
   try {
     const { dataJson } = await getDiagramResource(svgResourceId);
     await joplin.clipboard.writeText(excalidrawClipboardPayload(dataJson));
-    await showToast('Copied as Excalidraw');
+    await showToast('Copied as JSON');
   } catch (error) {
-    console.error('excalidraw: could not copy the drawing as Excalidraw:', error);
-    await joplin.views.dialogs.showMessageBox('Could not copy this Excalidraw drawing as Excalidraw elements.');
+    console.error('excalidraw: could not copy the drawing as JSON:', error);
+    await joplin.views.dialogs.showMessageBox('Could not copy this Excalidraw drawing as JSON.');
   }
 }
 
@@ -503,7 +503,7 @@ joplin.plugins.register({
 
     await joplin.commands.register({
       name: 'excalidraw.copyExcalidraw',
-      label: 'Copy Excalidraw drawing as Excalidraw',
+      label: 'Copy Excalidraw drawing as JSON',
       iconName: 'fas fa-code',
       execute: async () => {
         const svgResourceId = await findExcalidrawForEditing();
@@ -531,7 +531,7 @@ joplin.plugins.register({
           { commandName: 'excalidraw.edit', label: 'Edit Excalidraw drawing' },
           { commandName: 'excalidraw.editInNewWindow', label: 'Edit Excalidraw drawing in new window' },
           { commandName: 'excalidraw.copyImage', label: 'Copy Excalidraw drawing as image' },
-          { commandName: 'excalidraw.copyExcalidraw', label: 'Copy Excalidraw drawing as Excalidraw' },
+          { commandName: 'excalidraw.copyExcalidraw', label: 'Copy Excalidraw drawing as JSON' },
         );
       }
       return contextMenu;

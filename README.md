@@ -13,7 +13,7 @@
   - ✏️ **Edit drawing** — opens the editor.
   - ↗️ **Edit drawing in a new window** — see below.
   - 🖼️ **Copy drawing as image** — see below.
-  - `{}` **Copy drawing as Excalidraw** — see below.
+  - `{}` **Copy as JSON** — see below.
 
   In the **Rich Text editor** and in HTML notes nothing is injected (the extra markup would be
   saved into the note, or would always be visible) — **double-click** a drawing to edit it there.
@@ -22,7 +22,7 @@
   only show up when the current line actually holds a drawing.
 - **Tools → Excalidraw** groups every command in one submenu: *Add Excalidraw drawing*, *Edit
   Excalidraw drawing*, *Edit Excalidraw drawing in new window*, *Copy Excalidraw drawing as
-  image*, *Copy Excalidraw drawing as Excalidraw*. From the menu they act on the drawing on the
+  image*, *Copy Excalidraw drawing as JSON*. From the menu they act on the drawing on the
   cursor's line, then the selection, then the note's only drawing.
 - **Copy as image** puts a PNG on the clipboard, ready to paste into a chat, a mail or another
   app. Joplin's own *Copy image* works in the viewer but does nothing for a drawing in the
@@ -30,10 +30,11 @@
   read SVG ([joplin#15878](https://github.com/laurent22/joplin/issues/15878)) — so the plugin
   rasterises the drawing itself, at 2× for crisp pasting on HiDPI screens. Dark drawings copy
   dark.
-- **Copy as Excalidraw** puts the drawing on the clipboard in Excalidraw's own clipboard format,
-  as text. Paste it into [excalidraw.com](https://excalidraw.com), into Obsidian's Excalidraw
-  plugin, or into another drawing in Joplin, and you get the **real elements** — movable,
-  editable shapes — not a picture of them. Images inside the drawing travel with it.
+- **Copy as JSON** puts the drawing on the clipboard as text, in Excalidraw's own clipboard
+  format — the JSON Excalidraw itself writes when you copy elements. Paste it into
+  [excalidraw.com](https://excalidraw.com), into Obsidian's Excalidraw plugin, or into another
+  drawing here, and you get **editable elements** — movable, editable shapes — not a picture of
+  them. Images inside the drawing travel with it.
 - **Edit in a new window** opens the note in a second Joplin window and puts the editor there,
   so you can read or type in the note while you draw. **Existing drawings only** — a new drawing
   has to insert a link into the note body, and the first window would overwrite it. Two

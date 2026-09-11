@@ -16,12 +16,13 @@ First release as **Excalidraw** (`io.github.pmslava.excalidraw`), the continuati
   Excalidraw. Joplin's own "Copy image" copies nothing for a drawing in the Markdown editor,
   because Electron cannot decode SVG (joplin#15878); the plugin rasterises the drawing itself,
   at 2x, light or dark
-- Copy a drawing as Excalidraw: the clipboard gets Excalidraw's own clipboard format, so pasting
-  into excalidraw.com, Obsidian or another drawing inserts real elements, not a picture
+- Copy a drawing as JSON: the clipboard gets Excalidraw's own clipboard format, so pasting into
+  excalidraw.com, Obsidian's Excalidraw plugin or another drawing here inserts editable
+  elements, not a picture
 - Edit a drawing in a second Joplin window, so the note and the drawing are side by side
   (existing drawings only). The same drawing can no longer be opened in two editors at once
 - A hover toolbar over each drawing in the viewer -- Edit, Edit in a new window, Copy as image,
-  Copy as Excalidraw -- replacing the single "Edit" button, in Joplin's own theme colours
+  Copy as JSON -- replacing the single "Edit" button, in Joplin's own theme colours
 - Tools > Excalidraw submenu grouping every command
 - Edit a drawing from the Markdown editor: right-click menu and the cursor's current line
 - Drawings refresh in place after saving, instead of showing a stale preview, and stay visible
@@ -29,6 +30,9 @@ First release as **Excalidraw** (`io.github.pmslava.excalidraw`), the continuati
   first window's Markdown editor (a resource's file is briefly renamed away while Joplin
   rewrites it, and `editor.execCommand` only ever reaches the focused window's editor). The
   image retries itself, and each window catches up when it regains focus
+- Excalidraw's own chrome stays inside the dialog on a narrow window: the Library button goes
+  icon-only, the toolbar's keybinding hints are hidden and the top row tightens up, instead of
+  the Library button being cut off at the dialog's edge
 - Edit button now works in the Rich Text editor
 - "Mermaid to Excalidraw" works again: opening it no longer crashes the editor (upstream #3)
 - New plugin id and renamed internal identifiers (content scripts, commands, CSS classes, temp
