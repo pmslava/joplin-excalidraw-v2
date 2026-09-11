@@ -12,7 +12,17 @@ First release as **Excalidraw** (`io.github.pmslava.excalidraw`), the continuati
 - Full-size toggle in the editor: expand the dialog to the whole Joplin window and back
 - Light and dark theme support, with settings for new drawings and for keeping each drawing's
   saved theme
-- Tools > Excalidraw submenu grouping the Add and Edit commands
+- Copy a drawing as a PNG image, from the viewer's toolbar, the right-click menu or Tools >
+  Excalidraw. Joplin's own "Copy image" copies nothing for a drawing in the Markdown editor,
+  because Electron cannot decode SVG (joplin#15878); the plugin rasterises the drawing itself,
+  at 2x, light or dark
+- Copy a drawing as Excalidraw: the clipboard gets Excalidraw's own clipboard format, so pasting
+  into excalidraw.com, Obsidian or another drawing inserts real elements, not a picture
+- Edit a drawing in a second Joplin window, so the note and the drawing are side by side
+  (existing drawings only). The same drawing can no longer be opened in two editors at once
+- A hover toolbar over each drawing in the viewer -- Edit, Edit in a new window, Copy as image,
+  Copy as Excalidraw -- replacing the single "Edit" button, in Joplin's own theme colours
+- Tools > Excalidraw submenu grouping every command
 - Edit a drawing from the Markdown editor: right-click menu and the cursor's current line
 - Drawings refresh in place after saving, instead of showing a stale preview
 - Edit button now works in the Rich Text editor

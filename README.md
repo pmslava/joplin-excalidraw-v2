@@ -8,14 +8,45 @@
 
 - **Create a drawing** — click the pencil button on the editor toolbar, draw, and close the
   dialog. The drawing is inserted at the cursor as a normal image.
-- **Edit a drawing** — hover a drawing in the Markdown viewer or in the Rich Text editor and
-  click the **Edit 🖊️** button that appears over it.
-- **Edit from the Markdown editor** — put the cursor on the line holding a drawing and use
-  **Tools → Excalidraw → Edit Excalidraw drawing**, or right-click and pick the same entry from
-  the editor's context menu. The entry only shows up when the current line actually holds a
-  drawing.
-- **Tools → Excalidraw** groups both commands (*Add Excalidraw drawing*, *Edit Excalidraw
-  drawing*) in one submenu.
+- **A hover toolbar on every drawing.** Hover a drawing in the Markdown viewer and a small
+  island appears in its top-right corner with four buttons:
+  - ✏️ **Edit drawing** — opens the editor.
+  - ↗️ **Edit drawing in a new window** — see below.
+  - 🖼️ **Copy drawing as image** — see below.
+  - `{}` **Copy drawing as Excalidraw** — see below.
+
+  In the **Rich Text editor** and in HTML notes nothing is injected (the extra markup would be
+  saved into the note, or would always be visible) — **double-click** a drawing to edit it there.
+- **Right-click in the Markdown editor** — put the cursor on the line holding a drawing and
+  right-click: the same four actions appear at the bottom of the editor's context menu. They
+  only show up when the current line actually holds a drawing.
+- **Tools → Excalidraw** groups every command in one submenu: *Add Excalidraw drawing*, *Edit
+  Excalidraw drawing*, *Edit Excalidraw drawing in new window*, *Copy Excalidraw drawing as
+  image*, *Copy Excalidraw drawing as Excalidraw*. From the menu they act on the drawing on the
+  cursor's line, then the selection, then the note's only drawing.
+- **Copy as image** puts a PNG on the clipboard, ready to paste into a chat, a mail or another
+  app. Joplin's own *Copy image* works in the viewer but does nothing for a drawing in the
+  Markdown editor — it decodes the resource with Electron's native image code, which cannot
+  read SVG ([joplin#15878](https://github.com/laurent22/joplin/issues/15878)) — so the plugin
+  rasterises the drawing itself, at 2× for crisp pasting on HiDPI screens. Dark drawings copy
+  dark.
+- **Copy as Excalidraw** puts the drawing on the clipboard in Excalidraw's own clipboard format,
+  as text. Paste it into [excalidraw.com](https://excalidraw.com), into Obsidian's Excalidraw
+  plugin, or into another drawing in Joplin, and you get the **real elements** — movable,
+  editable shapes — not a picture of them. Images inside the drawing travel with it.
+- **Edit in a new window** opens the note in a second Joplin window and puts the editor there,
+  so you can read or type in the note while you draw. **Existing drawings only** — a new drawing
+  has to insert a link into the note body, and the first window would overwrite it. Two
+  different drawings can be open at once; the same drawing can only be open in one editor.
+
+  > [!WARNING]
+  > Close the editor with its own **Close** button (or *Escape*), not the window's title bar.
+  > Joplin gives a plugin no notice when a window is closed, so closing the *window* loses any
+  > unsaved changes.
+
+  If the editor ever opens in the wrong window, Joplin lost the focus race: open the note in a
+  new window yourself (**Note → Open in new window**) and click **Edit** there — that is always
+  deterministic, because the focus is yours.
 - **Save and Close inside the editor.** The bottom right of the canvas holds one small bar with
   **Save**, **Close** and a full-size toggle, instead of Joplin's button band under the dialog —
   in both sizes, and out of the way of Excalidraw's own toolbars. *Escape* still closes the
@@ -55,7 +86,7 @@ by neagix, which is no longer maintained (last commit October 2025), itself a fo
 [`joplin-excalidraw`](https://github.com/artikell/joplin-excalidraw) by artikell.
 
 > [!IMPORTANT]
-> **Uninstall the old plugin first.** With both installed you get two Edit buttons on every
+> **Uninstall the old plugin first.** With both installed you get two sets of buttons on every
 > drawing, two pencil buttons on the toolbar and two Tools → Excalidraw submenus — and because
 > Joplin does not namespace content-script ids, an Edit click can be handled by the *other*
 > plugin's editor.
