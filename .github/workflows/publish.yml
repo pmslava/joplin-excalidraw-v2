@@ -1,0 +1,198 @@
+name: Publish to npm
+
+# Publishes the plugin package to npm when a GitHub Release is published (or manually). Same
+# pipeline as joplin-plugin-whereabouts / -ridgeline / -cockpit.
+#
+# Authentication uses npm trusted publishing (OIDC): there is no NPM_TOKEN secret anywhere. npm is
+# told once to trust this repository and this workflow file, and the job exchanges a short-lived
+# GitHub OIDC token for publish rights. Configure it once at npmjs.com -> the package -> Settings ->
+# Trusted publisher, with:
+#
+#   Provider:    GitHub Actions
+#   Owner:       pmslava
+#   Repository:  joplin-plugin-excalidraw
+#   Workflow:    publish.yml
+#   Environment: npm
+#
+# The environment name has to match on both sides: GitHub only puts an `environment` claim into the
+# OIDC token when the job declares `environment:`; without it npm falls back to token authentication
+# and the publish fails with ENEEDAUTH.
+#
+# Notes:
+#  - setup-node is used WITHOUT `registry-url`: given that input it writes a placeholder auth token
+#    into .npmrc and npm then never starts the OIDC exchange (actions/setup-node#1551).
+#  - NODE_AUTH_TOKEN is not set, for the same reason. Provenance attestations come automatically.
+#  - Trusted publishing only works on GitHub-hosted runners and needs npm 11.5.1 or later.
+#  - The first version of a package cannot use trusted publishing (npm cannot attach a trusted
+#    publisher to a package that does not exist yet), so the very first release is published by
+#    hand once; the idempotency guard below then makes this workflow a no-op for that version.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Build & publish to npm
+    runs-on: ubuntu-24.04
+    # Must match the environment configured on the npm trusted publisher.
+    environment: npm
+    permissions:
+      contents: read
+      # Lets the job mint the OIDC token that npm exchanges for publish rights.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      # On a Release, the version comes from the tag (v3.0.0 -> 3.0.0); on a manual run, from
+      # package.json. It is written into BOTH package.json and src/manifest.json so the npm package
+      # and the .jpl inside it agree.
+      - name: Resolve package & manifest version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            echo "Using release tag version: $VERSION (from $GITHUB_REF_NAME)"
+          else
+            VERSION="$(node -p "require('./package.json').version")"
+            echo "No release tag (event=${{ github.event_name }}); using package.json version: $VERSION"
+          fi
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          VERSION="$VERSION" node -e "const fs=require('fs');const p='src/manifest.json';const m=JSON.parse(fs.readFileSync(p,'utf8'));m.version=process.env.VERSION;fs.writeFileSync(p,JSON.stringify(m,null,'\t')+'\n');console.log('manifest.json version ->',m.version)"
+          echo "PUBLISH_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - run: yarn install --frozen-lockfile
+
+      # Build the publishable artifact (publish/ is the only directory in package.json "files").
+      - run: npm run dist
+
+      # The Joplin plugin repository picks packages up from npm by the "joplin-plugin" keyword and
+      # installs the .jpl found in the tarball, so fail loudly rather than publish a useless package.
+      - name: Check the package contains the built plugin
+        run: |
+          PLUGIN_ID="$(node -p "require('./src/manifest.json').id")"
+          for FILE in "publish/$PLUGIN_ID.jpl" "publish/$PLUGIN_ID.json"; do
+            if [ ! -s "$FILE" ]; then
+              echo "::error::Expected $FILE to exist and be non-empty after npm run dist"
+              exit 1
+            fi
+          done
+          echo "Packing $(node -p "require('./package.json').name")@$PUBLISH_VERSION:"
+          npm pack --dry-run --ignore-scripts
+
+      # Trusted publishing needs a current runtime and npm 11.5.1 or later.
+      - name: Use a current Node runtime for trusted publishing
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Use an npm that supports trusted publishing
+        run: |
+          npm install -g 'npm@^11.5.1'
+          echo "node $(node --version), npm $(npm --version)"
+
+      # Prints the OIDC claims npm will present (never the token itself). A mismatch against the
+      # trusted publisher configured on npmjs.com is the usual cause of an otherwise-silent ENEEDAUTH.
+      - name: Show the OIDC claims npm will present
+        run: |
+          node -e "
+          (async () => {
+            const url = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+            url.searchParams.set('audience', 'npm:registry.npmjs.org');
+            const response = await fetch(url, { headers: {
+              Authorization: 'Bearer ' + process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,
+              Accept: 'application/json',
+            } });
+            const body = await response.json();
+            if (!body.value) {
+              console.log('No id_token returned, status ' + response.status);
+              return;
+            }
+            const payload = JSON.parse(Buffer.from(body.value.split('.')[1], 'base64').toString('utf8'));
+            for (const claim of ['sub', 'aud', 'repository', 'repository_owner', 'workflow_ref', 'job_workflow_ref', 'environment', 'ref', 'repository_visibility']) {
+              console.log(claim.padEnd(24) + (payload[claim] === undefined ? '(absent)' : payload[claim]));
+            }
+            const name = require('./package.json').name;
+            const exchange = 'https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/' + encodeURIComponent(name);
+            const result = await fetch(exchange, {
+              method: 'POST',
+              headers: { Authorization: 'Bearer ' + body.value, 'Content-Type': 'application/json' },
+            });
+            const raw = await result.text();
+            let message = raw.slice(0, 300);
+            try { message = JSON.parse(raw).message ?? message; } catch {}
+            console.log('');
+            console.log('token exchange for ' + name + ': HTTP ' + result.status);
+            console.log('registry says:  ' + (result.ok ? '(exchange succeeded)' : message));
+          })()
+          "
+
+      # Idempotency guard: if this exact version is already on npm, skip the publish and finish green.
+      # This makes re-runs safe and covers the first-release bootstrap (published by hand once).
+      - name: Skip publish if this version is already on npm
+        id: version_check
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          EXISTING="$(npm view "$NAME@$PUBLISH_VERSION" version 2>/dev/null || true)"
+          if [ "$EXISTING" = "$PUBLISH_VERSION" ]; then
+            echo "$PUBLISH_VERSION already on npm - skipping publish (bootstrap or re-run)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "$PUBLISH_VERSION not found on npm - proceeding to publish"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: steps.version_check.outputs.skip != 'true'
+        run: |
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            echo "::error::No OIDC token endpoint available. The job needs 'permissions: id-token: write'."
+            exit 1
+          fi
+          if npm config get //registry.npmjs.org/:_authToken 2>/dev/null | grep -qv '^undefined$'; then
+            echo "::warning::An auth token is configured. npm may use it instead of trusted publishing."
+          fi
+          echo "Registry: $(npm config get registry)"
+          echo "Publishing $(node -p "require('./package.json').name")@$PUBLISH_VERSION via OIDC"
+          npm publish --ignore-scripts --loglevel=verbose
+
+  # Attach the built .jpl to the GitHub Release so it can be installed from the releases page.
+  attach-jpl:
+    name: Attach the built .jpl to the release
+    if: github.event_name == 'release'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - name: Resolve manifest version from the tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="$VERSION" node -e "const fs=require('fs');const p='src/manifest.json';const m=JSON.parse(fs.readFileSync(p,'utf8'));m.version=process.env.VERSION;fs.writeFileSync(p,JSON.stringify(m,null,'\t')+'\n');console.log('manifest.json version ->',m.version)"
+
+      - run: yarn install --frozen-lockfile
+
+      - run: npm run dist
+
+      - name: Upload the .jpl as a release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PLUGIN_ID="$(node -p "require('./src/manifest.json').id")"
+          JPL="publish/$PLUGIN_ID.jpl"
+          if [ ! -s "$JPL" ]; then
+            echo "::error::Expected $JPL to exist and be non-empty after npm run dist"
+            exit 1
+          fi
+          gh release upload "$GITHUB_REF_NAME" "$JPL" --clobber
+          echo "Attached $JPL to release $GITHUB_REF_NAME"

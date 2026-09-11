@@ -1,0 +1,57 @@
+name: Build
+
+# Builds the plugin on every push to main and every pull request, and keeps the built .jpl as a
+# workflow artifact. Publishing is deliberately NOT done here: see publish.yml, which runs only when
+# a GitHub Release is published.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build the plugin
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      # The version lives in two places; publish.yml rewrites both from the release tag, but a
+      # mismatch on main means somebody bumped one file and forgot the other.
+      - name: Check the version is pinned in package.json and src/manifest.json
+        run: |
+          node -e '
+            const pkg = require("./package.json").version;
+            const manifest = require("./src/manifest.json").version;
+            if (pkg !== manifest) {
+              console.error("::error::package.json is " + pkg + " but src/manifest.json is " + manifest);
+              process.exit(1);
+            }
+            console.log("Version " + pkg + " is consistent.");
+          '
+
+      - run: npm run dist
+
+      - name: Check the build produced the plugin archive
+        run: |
+          PLUGIN_ID="$(node -p "require('./src/manifest.json').id")"
+          for FILE in "publish/$PLUGIN_ID.jpl" "publish/$PLUGIN_ID.json"; do
+            if [ ! -s "$FILE" ]; then
+              echo "::error::Expected $FILE to exist and be non-empty after npm run dist"
+              exit 1
+            fi
+          done
+          ls -la publish/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-${{ github.sha }}
+          path: publish/
+          retention-days: 14
