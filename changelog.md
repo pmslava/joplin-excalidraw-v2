@@ -1,6 +1,6 @@
 # Joplin changelog
 
-## 1.0.0
+## 3.0.0
 
 First release as **Excalidraw** (`io.github.pmslava.excalidraw`), the continuation of
 `joplin-excalidraw-v2` 2.0.0 by neagix.
