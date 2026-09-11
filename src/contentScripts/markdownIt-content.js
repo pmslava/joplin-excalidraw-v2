@@ -160,39 +160,88 @@
 	// var(--joplin-background-color, #fff) therefore always fell back to white,
 	// even in a dark theme.
 	//
-	// So derive the palette from the viewer's real colours, the same way the
-	// editor's detectJoplinTheme() does: read the rendered background and take
-	// its luminance.
+	// The viewer gives us nothing that *names* the theme either -- no class, no
+	// attribute, no custom property (the only class the viewer ever puts on
+	// <html> is -larger-controls). So the theme has to be read back off the
+	// rendered colours, the way the editor's detectJoplinTheme() does.
+	//
+	// And it cannot be read only ONCE, when the island is built. Joplin renders
+	// a note like this (app-desktop/gui/note-viewer/index.html, ipc.setHtml):
+	//
+	//     contentElement.innerHTML = html;        // the note -- with no <style>
+	//     addPluginAssets(options.pluginAssets);  // appends <script> / <link>
+	//     document.dispatchEvent(new Event('joplin-noteDidUpdate'));
+	//
+	// The theme stylesheet is not part of that HTML: the desktop renders with
+	// { splitted: true, externalAssetsOnly: true } (gui/hooks/useMarkupToHtml.ts),
+	// so MdToHtml writes noteStyle()'s CSS to a cache file and PUSHES it onto
+	// the end of pluginAssets. addPluginAssets therefore appends this script
+	// BEFORE that <link>, a dynamically inserted script never waits for a
+	// pending stylesheet, and joplin-noteDidUpdate is dispatched synchronously
+	// before either has loaded. So the first time this file runs, the body can
+	// still have no background at all -- and then the old code fell through to
+	// prefers-color-scheme, which inside the viewer reports the OS's setting,
+	// not Joplin's (the desktop only ever READS nativeTheme.shouldUseDarkColors;
+	// it never sets nativeTheme.themeSource). On a light desktop running
+	// Joplin's Dark theme that painted a white island on a dark note.
+	//
+	// So the palette is decided again every time an island is shown, and again
+	// on every joplin-noteDidUpdate -- by then the stylesheet has applied.
 
 	// Luminance of a CSS rgb/rgba colour, or null when it carries no real
 	// colour (unparseable, or fully transparent).
-	function backgroundLuminance(color) {
+	function luminance(color) {
 		var match = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+))?\)/i.exec(color || '');
 		if (!match || match[4] === '0') return null;
 		var r = Number(match[1]), g = Number(match[2]), b = Number(match[3]);
 		return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 	}
 
-	// 'dark' or 'light' for the document the toolbar is drawn in. Called every
-	// time a toolbar is built, so a theme change between renders is picked up
-	// (Joplin re-renders the note and fires joplin-noteDidUpdate).
+	// 'dark' / 'light' from an element's painted background, or null if it has
+	// none (so the next candidate gets a turn).
+	function backgroundTheme(element) {
+		if (!element) return null;
+		var value = luminance(getComputedStyle(element).backgroundColor);
+		return value === null ? null : (value < 0.5 ? 'dark' : 'light');
+	}
+
+	// 'dark' or 'light' for the document the toolbar is drawn in.
 	function detectTheme() {
 		try {
-			var elements = [document.body, document.documentElement];
+			// noteStyle.ts paints the theme background on body; documentElement
+			// and #rendered-md are checked after it so a user stylesheet (or a
+			// future Joplin) that moves it still works.
+			var elements = [document.body, document.documentElement, document.getElementById('rendered-md')];
 			for (var i = 0; i < elements.length; i++) {
-				if (!elements[i]) continue;
-				var luminance = backgroundLuminance(getComputedStyle(elements[i]).backgroundColor);
-				if (luminance !== null) return luminance < 0.5 ? 'dark' : 'light';
+				var theme = backgroundTheme(elements[i]);
+				if (theme) return theme;
+			}
+			// Nothing is painted, but noteStyle always sets body's text colour
+			// in the same rule as the background, so light text means a dark
+			// theme. This catches a theme whose background happens to be
+			// transparent.
+			if (document.body) {
+				var text = luminance(getComputedStyle(document.body).color);
+				if (text !== null) return text > 0.5 ? 'dark' : 'light';
 			}
 		} catch (e) {
 			console.warn('excalidraw: could not detect the Joplin theme:', e);
 		}
+		// Last resort only: in the viewer this is the OS's setting, which need
+		// not agree with Joplin's theme.
 		try {
 			if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
 		} catch (e) {
 			// no matchMedia: fall through to light
 		}
 		return 'light';
+	}
+
+	// Put the current palette on one island. Safe to call repeatedly.
+	function applyTheme(toolbar) {
+		var dark = detectTheme() === 'dark';
+		toolbar.classList.toggle('excalidraw-plugin--dark', dark);
+		toolbar.classList.toggle('excalidraw-plugin--light', !dark);
 	}
 
 	// 16 px line icons, drawn with the current text colour so they follow Joplin's
@@ -244,8 +293,10 @@
 		container.className = 'excalidraw-plugin--toolbarContainer';
 
 		var toolbar = document.createElement('span');
-		// The palette is chosen here, per toolbar, from the note's real colours.
-		toolbar.className = 'excalidraw-plugin--toolbar excalidraw-plugin--' + detectTheme();
+		toolbar.className = 'excalidraw-plugin--toolbar';
+		// A first guess; updateVisible() re-decides before the island is ever
+		// seen, by which time the note's stylesheet has applied.
+		applyTheme(toolbar);
 		container.appendChild(toolbar);
 
 		var buttons = actions.map(function (action) {
@@ -277,6 +328,10 @@
 				toolbar.matches(':hover') ||
 				hasFocus(toolbar) ||
 				hasFocus(image);
+			// Re-read the theme on the way in: the island is built while the
+			// note's stylesheet may still be loading (see the Theme note
+			// above), so the colours it was born with can be wrong.
+			if (show) applyTheme(toolbar);
 			container.classList.toggle('-show', show);
 		}
 		function updatePosition() {
@@ -337,6 +392,14 @@
 		var convertible = document.querySelectorAll('img.excalidraw-plugin--convertible');
 		Array.prototype.forEach.call(convertible, function (image) {
 			processImage(image, onConvert, CONVERT_ACTIONS);
+		});
+
+		// Re-decide the palette for every island that already exists: this runs
+		// on joplin-noteDidUpdate, so it also picks up a theme the user changed
+		// between renders.
+		var toolbars = document.querySelectorAll('.excalidraw-plugin--toolbar');
+		Array.prototype.forEach.call(toolbars, function (toolbar) {
+			applyTheme(toolbar);
 		});
 	}
 

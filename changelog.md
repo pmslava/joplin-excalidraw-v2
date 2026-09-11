@@ -1,5 +1,10 @@
 # Joplin changelog
 
+## 3.0.2
+
+- The hover toolbar's dark/light detection now waits for the note's theme to be applied and
+  re-checks whenever the toolbar is shown; in 3.0.1 it could still come out white in dark themes
+
 ## 3.0.1
 
 - The hover toolbar over drawings is now dark in dark themes; it used to fall back to white when
