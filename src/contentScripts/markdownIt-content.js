@@ -150,6 +150,51 @@
 		return element.contains(document.activeElement);
 	}
 
+	// --- Theme -------------------------------------------------------------
+	// The note viewer does NOT define the --joplin-* custom properties: Joplin
+	// builds its note stylesheet in packages/renderer/noteStyle.ts, which writes
+	// the theme's colours straight into rules ("body { color: ...;
+	// background-color: ... }") and defines only --scrollbar-size. The
+	// --joplin-* variables come from themeToCss.ts, which is used for plugin
+	// webviews and dialogs, not for this document. Colouring the toolbar with
+	// var(--joplin-background-color, #fff) therefore always fell back to white,
+	// even in a dark theme.
+	//
+	// So derive the palette from the viewer's real colours, the same way the
+	// editor's detectJoplinTheme() does: read the rendered background and take
+	// its luminance.
+
+	// Luminance of a CSS rgb/rgba colour, or null when it carries no real
+	// colour (unparseable, or fully transparent).
+	function backgroundLuminance(color) {
+		var match = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+))?\)/i.exec(color || '');
+		if (!match || match[4] === '0') return null;
+		var r = Number(match[1]), g = Number(match[2]), b = Number(match[3]);
+		return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+	}
+
+	// 'dark' or 'light' for the document the toolbar is drawn in. Called every
+	// time a toolbar is built, so a theme change between renders is picked up
+	// (Joplin re-renders the note and fires joplin-noteDidUpdate).
+	function detectTheme() {
+		try {
+			var elements = [document.body, document.documentElement];
+			for (var i = 0; i < elements.length; i++) {
+				if (!elements[i]) continue;
+				var luminance = backgroundLuminance(getComputedStyle(elements[i]).backgroundColor);
+				if (luminance !== null) return luminance < 0.5 ? 'dark' : 'light';
+			}
+		} catch (e) {
+			console.warn('excalidraw: could not detect the Joplin theme:', e);
+		}
+		try {
+			if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+		} catch (e) {
+			// no matchMedia: fall through to light
+		}
+		return 'light';
+	}
+
 	// 16 px line icons, drawn with the current text colour so they follow Joplin's
 	// theme. Static markup assigned through innerHTML: no inline event attributes,
 	// so the Rich Text editor's CSP has nothing to strip (it doesn't get a toolbar
@@ -199,7 +244,8 @@
 		container.className = 'excalidraw-plugin--toolbarContainer';
 
 		var toolbar = document.createElement('span');
-		toolbar.className = 'excalidraw-plugin--toolbar';
+		// The palette is chosen here, per toolbar, from the note's real colours.
+		toolbar.className = 'excalidraw-plugin--toolbar excalidraw-plugin--' + detectTheme();
 		container.appendChild(toolbar);
 
 		var buttons = actions.map(function (action) {

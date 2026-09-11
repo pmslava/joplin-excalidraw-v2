@@ -1,5 +1,10 @@
 # Joplin changelog
 
+## 3.0.1
+
+- The hover toolbar over drawings is now dark in dark themes; it used to fall back to white when
+  Joplin's theme variables were not available in the note viewer
+
 ## 3.0.0
 
 First release as **Excalidraw** (`io.github.pmslava.excalidraw`), the continuation of
