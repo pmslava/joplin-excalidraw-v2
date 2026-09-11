@@ -10,9 +10,9 @@
 //
 // The markdown-it renderer only *tags* the Excalidraw images; this file finds
 // them and attaches the actions:
-//   - v2 drawings:        <img class="excalidraw--editable" ...>            -> "Edit"
-//   - legacy v1 diagrams: <img class="excalidraw--convertible"
-//                              data-excalidraw-diagram-id="..." ...>        -> "Convert to v2"
+//   - v2 drawings:        <img class="excalidraw-plugin--editable" ...>            -> "Edit"
+//   - legacy v1 diagrams: <img class="excalidraw-plugin--convertible"
+//                              data-excalidraw-plugin-diagram-id="..." ...>        -> "Convert to v2"
 //
 // NOTE: this file is intentionally plain JavaScript, not TypeScript. The webpack
 // "extraScripts" pipeline emits CommonJS modules (module.exports = ...), which is
@@ -21,7 +21,7 @@
 
 (function () {
 	// Must match Config.ContentScriptId in src/index.ts.
-	var contentScriptId = 'excalidraw-script';
+	var contentScriptId = 'io.github.pmslava.excalidraw.markdownIt';
 
 	// webviewApi is injected by Joplin into the viewer / Rich Text Editor webview.
 	function getWebviewApi() {
@@ -85,7 +85,7 @@
 	function onConvert(arg) {
 		var image = resolveImage(arg);
 		if (!image) return;
-		var diagramId = image.getAttribute('data-excalidraw-diagram-id');
+		var diagramId = image.getAttribute('data-excalidraw-plugin-diagram-id');
 		if (!diagramId) return;
 		var message = 'convert_v1_' + encodeURIComponent(diagramId);
 		var result = postMessage(message);
@@ -120,16 +120,16 @@
 	// and is positioned over the image here in JS.
 	function addButton(image, label, handler) {
 		var next = image.nextElementSibling;
-		if (next && next.classList && next.classList.contains('excalidraw--editButtonContainer')) {
+		if (next && next.classList && next.classList.contains('excalidraw-plugin--editButtonContainer')) {
 			return;
 		}
 
 		var container = document.createElement('span');
-		container.className = 'excalidraw--editButtonContainer';
+		container.className = 'excalidraw-plugin--editButtonContainer';
 
 		var button = document.createElement('button');
 		button.type = 'button';
-		button.className = 'excalidraw--editButton';
+		button.className = 'excalidraw-plugin--editButton';
 		button.textContent = label;
 		container.appendChild(button);
 
@@ -195,12 +195,12 @@
 	function processImages() {
 		if (!document.body) return;
 
-		var editable = document.querySelectorAll('img.excalidraw--editable');
+		var editable = document.querySelectorAll('img.excalidraw-plugin--editable');
 		Array.prototype.forEach.call(editable, function (image) {
 			processImage(image, onEdit, 'Edit 🖊️');
 		});
 
-		var convertible = document.querySelectorAll('img.excalidraw--convertible');
+		var convertible = document.querySelectorAll('img.excalidraw-plugin--convertible');
 		Array.prototype.forEach.call(convertible, function (image) {
 			processImage(image, onConvert, 'Convert to v2 🔄');
 		});

@@ -7,7 +7,7 @@
  * "Copy image" context-menu action keeps working. The button is positioned
  * over the image in markdownIt-content.js.
  */
-.excalidraw--editButtonContainer {
+.excalidraw-plugin--editButtonContainer {
 	display: inline-block;
 	position: relative;
 	opacity: 0;
@@ -16,14 +16,14 @@
 	transition: opacity 0.2s ease;
 }
 
-.excalidraw--editButtonContainer.-show,
-.excalidraw--editButtonContainer:hover,
-.excalidraw--editButtonContainer:focus-within {
+.excalidraw-plugin--editButtonContainer.-show,
+.excalidraw-plugin--editButtonContainer:hover,
+.excalidraw-plugin--editButtonContainer:focus-within {
 	opacity: 0.9;
 	overflow: visible;
 }
 
-.excalidraw--editButton {
+.excalidraw-plugin--editButton {
 	position: absolute;
 	width: max-content;
 	max-height: 50px;

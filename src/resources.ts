@@ -5,7 +5,7 @@ import { sep, join } from 'path'
 const fs = joplin.require('fs-extra')
 
 const Config = {
-    TempFolder: `${tmpdir}${sep}joplin-excalidraw-plugin${sep}`,
+    TempFolder: `${tmpdir}${sep}joplin-plugin-excalidraw-pmslava${sep}`,
     TitlePrefix: 'excalidraw-'
 }
 

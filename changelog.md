@@ -1,5 +1,23 @@
 # Joplin changelog
 
+## 1.0.0
+
+First release as **Excalidraw** (`io.github.pmslava.excalidraw`), the continuation of
+`joplin-excalidraw-v2` 2.0.0 by neagix.
+
+- Excalidraw 0.18.1
+- Fixed the text tool and the hand-drawn font in exported SVGs
+- Light and dark theme support, with settings for new drawings and for keeping each drawing's
+  saved theme
+- Tools > Excalidraw submenu grouping the Add and Edit commands
+- Edit a drawing from the Markdown editor: right-click menu and the cursor's current line
+- Drawings refresh in place after saving, instead of showing a stale preview
+- Edit button now works in the Rich Text editor
+- New plugin id and renamed internal identifiers (content scripts, commands, CSS classes, temp
+  folder) so the plugin no longer collides with joplin-excalidraw-v2
+
+The entries below are the history of the predecessor plugins, oldest first.
+
 ## v1.1.1 - 2022-10-7 18:37:29
 
 - artikell: fix windows open problem

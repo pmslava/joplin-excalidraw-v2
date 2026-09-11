@@ -5,8 +5,8 @@ import { ContentScriptType, MenuItemLocation, SettingItemType, ToolbarButtonLoca
 import { createDiagramResource, getDiagramResource, updateDiagramResource, clearDiskCache, duplicateV1DiagramAsV2, generateId } from './resources';
 
 const Config = {
-  ContentScriptId: 'excalidraw-script',
-  CodeMirrorScriptId: 'excalidraw-codemirror',
+  ContentScriptId: 'io.github.pmslava.excalidraw.markdownIt',
+  CodeMirrorScriptId: 'io.github.pmslava.excalidraw.codeMirror',
   SettingsSection: 'excalidraw',
   NewThemeSetting: 'newDrawingTheme',
   PreserveThemeSetting: 'preserveDrawingTheme',
@@ -273,7 +273,7 @@ joplin.plugins.register({
     });
 
     await joplin.commands.register({
-      name: 'addExcalidraw',
+      name: 'excalidraw.add',
       label: 'Add Excalidraw drawing',
       iconName: 'icon-excalidraw-plus-icon-filled',
       execute: async () => {
@@ -283,7 +283,7 @@ joplin.plugins.register({
     });
 
     await joplin.commands.register({
-      name: 'editExcalidraw',
+      name: 'excalidraw.edit',
       label: 'Edit Excalidraw drawing',
       iconName: 'icon-excalidraw-plus-icon-filled',
       execute: async () => {
@@ -292,12 +292,12 @@ joplin.plugins.register({
       }
     });
 
-    await joplin.views.toolbarButtons.create('addExcalidraw', 'addExcalidraw', ToolbarButtonLocation.EditorToolbar);
+    await joplin.views.toolbarButtons.create('excalidraw.add', 'excalidraw.add', ToolbarButtonLocation.EditorToolbar);
 
     // Group both commands under a single Tools > Excalidraw submenu.
     await joplin.views.menus.create('excalidrawMenu', 'Excalidraw', [
-      { commandName: 'addExcalidraw' },
-      { commandName: 'editExcalidraw' },
+      { commandName: 'excalidraw.add' },
+      { commandName: 'excalidraw.edit' },
     ], MenuItemLocation.Tools);
 
     // Offer "Edit Excalidraw drawing" in the editor's right-click menu, but only
@@ -306,7 +306,7 @@ joplin.plugins.register({
       if (excalidrawSvgIds(await editorCurrentLine()).length > 0) {
         contextMenu.items.push(
           { type: 'separator' },
-          { commandName: 'editExcalidraw', label: 'Edit Excalidraw drawing' },
+          { commandName: 'excalidraw.edit', label: 'Edit Excalidraw drawing' },
         );
       }
       return contextMenu;

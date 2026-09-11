@@ -58,7 +58,7 @@ export default (context: { contentScriptId: string }) => {
 					// Tag for the asset, which offers a "Convert to v2" action.
 					return defaultHtml.replace(
 						'<img ',
-						`<img class="excalidraw--convertible" data-excalidraw-diagram-id="${diagramId}" `,
+						`<img class="excalidraw-plugin--convertible" data-excalidraw-plugin-diagram-id="${diagramId}" `,
 					);
 				}
 
@@ -72,7 +72,7 @@ export default (context: { contentScriptId: string }) => {
 					}
 
 					// Tag for the asset, which offers an "Edit" action.
-					return defaultHtml.replace('<img ', '<img class="excalidraw--editable" ');
+					return defaultHtml.replace('<img ', '<img class="excalidraw-plugin--editable" ');
 				}
 
 				// Not an Excalidraw image.
