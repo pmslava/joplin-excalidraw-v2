@@ -34,14 +34,17 @@
   }
   
 /* ---------------------------------------------------------------------------
-   Full-size drawing dialog
+   The drawing dialog
 
-   Joplin's plugin dialog is 90vw x 90vh, padded on every side, with a button bar
-   underneath the content — so the drawing is squeezed by a margin all round and
-   an empty band is left at the bottom. The toggle in the editor's top-right
-   corner adds .excalidraw-plugin-full to the dialog element (see
-   src/local-excalidraw/index.ts), and the rules below stretch the dialog to the
-   whole window and float Joplin's own Save / Close buttons over the canvas.
+   Joplin's plugin dialog is 90vw x 90vh, padded on every side, with a Save /
+   Close button bar underneath the content. The Excalidraw editor inside it
+   draws its own Save, Close and full-size buttons as one island over the
+   canvas (src/local-excalidraw/), so Joplin's bar is hidden in both sizes, and
+   a toggle in that island stretches the dialog to the whole window.
+
+   The editor marks the dialog element from inside the iframe:
+   .excalidraw-plugin-dialog while it is mounted, .excalidraw-plugin-full while
+   full size (see src/local-excalidraw/index.ts, which shares both names).
 
    The markup, from Joplin v3.7.16 (services/plugins/UserWebviewDialog.tsx and
    lib/components/Dialog.tsx):
@@ -55,11 +58,21 @@
        </div>
      </dialog>
 
-   Every rule is scoped by .excalidraw-plugin-full, so other plugins' dialogs are
-   untouched. No !important is needed: Joplin's inline style on the webview iframe
-   only sets the --content-width / --content-height custom properties (used by its
-   .-fit-to-content rule, which this dialog does not use), never width or height.
+   Every rule is scoped by one of those two classes, so other plugins' dialogs
+   are untouched. No !important is needed: Joplin's inline style on the webview
+   iframe only sets the --content-width / --content-height custom properties
+   (used by its .-fit-to-content rule, which this dialog does not use), never
+   width or height.
    --------------------------------------------------------------------------- */
+
+/* Joplin's Save / Close bar, replaced by the editor's own island. The class is
+   only added once the editor has actually rendered, and is removed again if it
+   is torn down, so the dialog is never left without a way out. .content is a
+   flex column and .user-dialog-wrapper is flex:1, so the webview simply grows
+   into the band the bar used to occupy — no empty strip at the bottom. */
+.user-webview-dialog.excalidraw-plugin-dialog .user-dialog-button-bar {
+    display: none;
+}
 
 .user-webview-dialog.excalidraw-plugin-full {
     /* .user-webview-dialog defaults these to 90vw / 90vh and > .content reads
@@ -80,11 +93,8 @@
     padding: 0;
     border-radius: 0;
     box-shadow: none;
-    /* containing block for the floating button bar below */
-    position: relative;
 }
 
-/* With the button bar out of the flow, the webview takes the whole height. */
 .user-webview-dialog.excalidraw-plugin-full > .content > .user-dialog-wrapper {
     flex: 1;
     min-height: 0;
@@ -93,19 +103,4 @@
 .user-webview-dialog.excalidraw-plugin-full .plugin-user-webview {
     width: 100%;
     height: 100%;
-}
-
-/* Save / Close float over the canvas at the bottom right, just left of
-   Excalidraw's round "?" button — that one is --lg-button-size (2.5rem) wide and
-   sits 1rem from the corner (.help-icon inside .App-menu_bottom), so 64px of
-   right offset clears it with room to spare. Only the bar's position, width and
-   padding change; Joplin's button styling, including the 6px gap it puts between
-   the buttons itself, is left alone. */
-.user-webview-dialog.excalidraw-plugin-full .user-dialog-button-bar {
-    position: absolute;
-    right: 64px;
-    bottom: 16px;
-    width: auto;
-    padding: 0;
-    z-index: 2;
 }

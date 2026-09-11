@@ -43,39 +43,150 @@ body,
     border: none;
     color: var(--button-color, var(--color-on-surface));
 }
-/* Full-size toggle, rendered through renderTopRightUI next to the Library
-   button. Shaped like Excalidraw's own .help-icon / .sidebar-trigger buttons,
-   reusing its variables, so it sits naturally beside them in both themes. */
-.excalidraw .excalidraw-full-size-button {
+
+/* ---------------------------------------------------------------------------
+   The plugin's action island: [full-size toggle] [Save] [Close]
+
+   One row of our own buttons at the bottom right of the canvas, rendered by
+   this app as a sibling of Excalidraw's root element (see index.ts) instead of
+   borrowing Excalidraw's top-right slot — which pushed its Library button off
+   a narrow dialog — or Joplin's own button bar, which overlapped Excalidraw's
+   mobile toolbar. Joplin's bar is hidden while the editor is open
+   (src/excalidraw.css), so these are the only Save and Close.
+
+   The island carries Excalidraw's own `excalidraw` class (plus `theme--dark`
+   when the drawing is dark) so that its design tokens resolve here: they are
+   declared on the editor's ROOT element in @excalidraw/excalidraw/index.css
+   (.excalidraw / .excalidraw.theme--dark), and this element is that root's
+   sibling, not its descendant. The layout the `.excalidraw` rule would impose
+   (position:relative, inset:0, 100% x 100%) is undone below; every selector
+   here is more specific than that single-class rule, and this stylesheet is
+   imported after Excalidraw's.
+   --------------------------------------------------------------------------- */
+
+.excalidraw-wrapper .excalidraw-plugin-actions {
+    position: absolute;
+    inset: auto;
+    /* Just left of Excalidraw's round "?" help button and aligned with it:
+       .App-menu_bottom is bottom:1rem with padding:0 1rem, and .help-icon in
+       its footer-right is --lg-button-size wide. Clears the zoom / undo
+       islands, which sit at the other end of the same row. */
+    right: calc(1rem + var(--lg-button-size) + 0.5rem);
+    bottom: 1rem;
+    width: auto;
+    height: auto;
+    /* Above the canvases (--zIndex-canvas 1, --zIndex-interactiveCanvas 2) and
+       above Excalidraw's UI layer and mobile bottom bar (--zIndex-layerUI 4),
+       but below its modals (1000) and popups / tooltips (1001). */
+    z-index: 5;
+
+    display: flex;
+    align-items: center;
+    /* 1px of island background between the buttons, like Excalidraw's own
+       .zoom-actions / .undo-redo-buttons groups. */
+    gap: 1px;
+    box-sizing: border-box;
+    background-color: var(--island-bg-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 0 0 1px var(--color-surface-lowest);
+    /* clips the buttons to the island's rounded corners */
+    overflow: hidden;
+    font-family: var(--ui-font);
+}
+
+.excalidraw-wrapper .excalidraw-plugin-action {
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    width: var(--lg-button-size);
     height: var(--lg-button-size);
-    padding: 0.625rem;
+    padding: 0 0.75rem;
     border: none;
-    border-radius: var(--border-radius-lg);
-    box-shadow: 0 0 0 1px var(--color-surface-lowest);
+    border-radius: 0;
     background-color: var(--color-surface-low);
     color: var(--button-color, var(--color-on-surface));
-    font-family: var(--ui-font);
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
     cursor: pointer;
 }
 
-.excalidraw .excalidraw-full-size-button svg {
+.excalidraw-wrapper .excalidraw-plugin-action:hover {
+    background-color: var(--button-hover-bg, var(--island-bg-color));
+}
+
+.excalidraw-wrapper .excalidraw-plugin-action:active {
+    background-color: var(--button-active-bg, var(--island-bg-color));
+}
+
+.excalidraw-wrapper .excalidraw-plugin-action:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--focus-highlight-color) inset;
+}
+
+/* Busy while the SVG export finishes, or disabled behind it. */
+.excalidraw-wrapper .excalidraw-plugin-action[disabled] {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.excalidraw-wrapper .excalidraw-plugin-action[aria-busy="true"] {
+    cursor: progress;
+}
+
+/* The toggle keeps its icon and stays square, like .help-icon. */
+.excalidraw-wrapper .excalidraw-plugin-action--icon {
+    width: var(--lg-button-size);
+    padding: 0;
+}
+
+.excalidraw-wrapper .excalidraw-plugin-action--icon svg {
     width: var(--lg-icon-size);
     height: var(--lg-icon-size);
 }
 
-.excalidraw .excalidraw-full-size-button:hover {
-    background-color: var(--button-hover-bg, var(--island-bg-color));
+/* Save is the primary action: Excalidraw's own filled primary button
+   (.ExcButton--color-primary.ExcButton--variant-filled). */
+.excalidraw-wrapper .excalidraw-plugin-action--primary {
+    background-color: var(--color-primary);
+    color: var(--color-surface-lowest);
 }
 
-.excalidraw .excalidraw-full-size-button:active {
-    background-color: var(--button-active-bg, var(--island-bg-color));
+.excalidraw-wrapper .excalidraw-plugin-action--primary:hover {
+    background-color: var(--color-brand-hover);
 }
 
-.excalidraw .excalidraw-full-size-button:focus-visible {
-    box-shadow: 0 0 0 2px var(--focus-highlight-color);
+.excalidraw-wrapper .excalidraw-plugin-action--primary:active {
+    background-color: var(--color-brand-active);
+}
+
+/* Excalidraw's mobile layout (.excalidraw--mobile on its root element, below
+   730px wide or in a short landscape window) hands the bottom of the editor to
+   .App-bottom-bar, so the island moves above it. index.ts measures how far up
+   that bar reaches and publishes it on the wrapper; the 3.875rem fallback is
+   the bare tool row (.App-toolbar-content: 8px around a 2rem button = 48px)
+   plus the 14px Excalidraw insets the bar from the bottom. :has() rather than a
+   class of our own: the mobile flag lives on the sibling element. */
+.excalidraw-wrapper:has(.excalidraw--mobile) .excalidraw-plugin-actions {
+    right: 1rem;
+    /* Tapping "Edit" with a selection opens Excalidraw's properties panel in
+       that same bar, and it can grow to almost the whole editor — so the offset
+       is clamped to keep the island on screen (1rem below the top edge) rather
+       than pushing it out of view. */
+    bottom: min(
+        calc(var(--excalidraw-plugin-bottom-bar, 3.875rem) + 0.5rem),
+        calc(100% - var(--lg-button-size) - 1rem)
+    );
+    max-width: calc(100% - 2rem);
+}
+
+/* Very narrow windows: keep the row inside the canvas by tightening the
+   labels rather than letting the island overflow. */
+@media (max-width: 400px) {
+    .excalidraw-wrapper .excalidraw-plugin-action {
+        padding: 0 0.5rem;
+        font-size: 0.8125rem;
+    }
 }

@@ -16,11 +16,13 @@
   drawing.
 - **Tools → Excalidraw** groups both commands (*Add Excalidraw drawing*, *Edit Excalidraw
   drawing*) in one submenu.
-- **Full size.** The button in the editor's top-right corner, next to *Library*, expands the
-  editor to the whole Joplin window and back — no margin round the drawing, and **Save** and
-  **Close** float over the canvas instead of sitting in a band below it. The last choice is
-  remembered, and the *Open the editor full size* setting (on by default) decides how the editor
-  opens the first time.
+- **Save and Close inside the editor.** The bottom right of the canvas holds one small bar with
+  **Save**, **Close** and a full-size toggle, instead of Joplin's button band under the dialog —
+  in both sizes, and out of the way of Excalidraw's own toolbars. *Escape* still closes the
+  editor too.
+- **Full size.** The toggle next to *Save* expands the editor to the whole Joplin window and
+  back — no margin round the drawing. The last choice is remembered, and the *Open the editor
+  full size* setting (on by default) decides how the editor opens the first time.
 - **Light and dark theme.** The editor follows Joplin's own theme by default. Two settings under
   **Tools → Options → Excalidraw**:
   - *Theme for new drawings* — Follow Joplin theme (default), Light, or Dark.

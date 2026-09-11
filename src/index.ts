@@ -63,7 +63,7 @@ const registerSettings = async (): Promise<void> => {
       section: Config.SettingsSection,
       public: true,
       label: 'Open the editor full size',
-      description: "Expand the drawing editor to the whole Joplin window. The button in the editor's top-right corner toggles it, and the last choice is remembered.",
+      description: "Expand the drawing editor to the whole Joplin window. The button next to Save and Close, at the bottom right of the editor, toggles it, and the last choice is remembered.",
     },
   });
 }
