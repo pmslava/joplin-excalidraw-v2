@@ -1,6 +1,6 @@
 {
   "name": "joplin-plugin-excalidraw",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "Excalidraw drawings in your notes: create and edit hand-drawn sketches, diagrams and whiteboards without leaving Joplin, with light and dark theme support and editing straight from the editor. Continuation of joplin-excalidraw-v2 (neagix) and joplin-excalidraw (artikell).",
   "author": "pmslava",
   "repository": {
