@@ -47,6 +47,89 @@ const newDrawingTheme = (): Theme => {
 const preserveSavedTheme = (): boolean =>
   parentInput('excalidraw_preserve_theme')?.value !== 'false';
 
+// --- Full-size mode --------------------------------------------------------
+// This editor lives in one of Joplin's plugin dialogs: 90vw x 90vh, padded all
+// round, with a button bar underneath. Putting a class on the dialog element
+// lets excalidraw.css (loaded into Joplin's main window as chrome CSS) stretch
+// it to the whole window and float Joplin's Save / Close buttons over the
+// canvas instead. The class name is shared with that stylesheet.
+const FULL_SIZE_CLASS = 'excalidraw-plugin-full';
+
+// The dialog element sits two documents up: this iframe -> Joplin's plugin
+// webview -> Joplin's main window. Any step can fail, most likely with the
+// "isolatePluginWebViews" setting on, which puts the parent on another origin.
+// Then the dialog simply stays at Joplin's default size and no button is shown.
+const findDialogElement = (): HTMLElement | null => {
+  try {
+    const webviewFrame = window.parent.frameElement;
+    return (webviewFrame?.closest('.user-webview-dialog') as HTMLElement | null) ?? null;
+  } catch (error) {
+    return null;
+  }
+};
+
+const dialogElement = findDialogElement();
+if (!dialogElement) {
+  console.warn('excalidraw: the Joplin dialog is out of reach, hiding the full-size button.');
+}
+
+// The plugin seeds this input from the "Open the editor full size" setting and
+// reads it back when the dialog closes, so the last choice is remembered.
+const readFullSize = (): boolean => {
+  try {
+    return parentInput('excalidraw_full_size')?.value === 'true';
+  } catch (error) {
+    return false;
+  }
+};
+
+const applyFullSize = (fullSize: boolean): void => {
+  try {
+    dialogElement?.classList.toggle(FULL_SIZE_CLASS, fullSize);
+    const input = parentInput('excalidraw_full_size');
+    if (input) input.value = String(fullSize);
+  } catch (error) {
+    console.warn('excalidraw: could not switch the dialog size:', error);
+  }
+};
+
+const InitialFullSize = dialogElement !== null && readFullSize();
+
+// Applied before React's first render, so the normal size barely flashes.
+if (InitialFullSize) applyFullSize(true);
+
+// Lucide-style maximize / minimize, stroked like Excalidraw's own icons.
+const icon = (...paths: string[]) =>
+  React.createElement(
+    'svg',
+    {
+      xmlns: 'http://www.w3.org/2000/svg',
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 2,
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      'aria-hidden': true,
+      focusable: 'false',
+    },
+    ...paths.map((d, index) => React.createElement('path', { key: index, d })),
+  );
+
+const expandIcon = () => icon(
+  'M8 3H5a2 2 0 0 0-2 2v3',
+  'M21 8V5a2 2 0 0 0-2-2h-3',
+  'M3 16v3a2 2 0 0 0 2 2h3',
+  'M16 21h3a2 2 0 0 0 2-2v-3',
+);
+
+const collapseIcon = () => icon(
+  'M8 3v3a2 2 0 0 1-2 2H3',
+  'M21 8h-3a2 2 0 0 1-2-2V3',
+  'M3 16h3a2 2 0 0 1 2 2v3',
+  'M16 21v-3a2 2 0 0 1 2-2h3',
+);
+
 const readInitialData = (): any => {
   let data: any = {};
   try {
@@ -72,6 +155,34 @@ const InitialData = readInitialData();
 const App = () => {
   const apiRef = React.useRef<any>(null);
   const svgTimer = React.useRef<number | null>(null);
+  const [fullSize, setFullSize] = React.useState(InitialFullSize);
+
+  // Keep the dialog and the hidden input in step with the toggle.
+  // useLayoutEffect, so the dialog is resized before the browser paints.
+  React.useLayoutEffect(() => {
+    applyFullSize(fullSize);
+  }, [fullSize]);
+
+  const toggleFullSize = React.useCallback(() => setFullSize(value => !value), []);
+
+  // A single button beside Excalidraw's Library button (renderTopRightUI renders
+  // into .layer-ui__wrapper__top-right, just before it). Nothing is rendered when
+  // the Joplin dialog is out of reach, since there would be nothing to resize.
+  const renderTopRightUI = React.useCallback(() => {
+    if (!dialogElement) return null;
+    const label = fullSize ? 'Normal size' : 'Full size';
+    return React.createElement(
+      'button',
+      {
+        type: 'button',
+        className: 'excalidraw-full-size-button',
+        title: label,
+        'aria-label': label,
+        onClick: toggleFullSize,
+      },
+      fullSize ? collapseIcon() : expandIcon(),
+    );
+  }, [fullSize, toggleFullSize]);
 
   // Serializing to JSON is cheap and synchronous, so we keep the hidden input
   // up to date on every change.
@@ -171,6 +282,7 @@ const App = () => {
         initialData: InitialData,
         excalidrawAPI: (api: any) => { apiRef.current = api; },
         onChange,
+        renderTopRightUI,
       },
         React.createElement(
           ExcalidrawLib.MainMenu, null,

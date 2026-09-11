@@ -10,6 +10,7 @@ const Config = {
   SettingsSection: 'excalidraw',
   NewThemeSetting: 'newDrawingTheme',
   PreserveThemeSetting: 'preserveDrawingTheme',
+  FullSizeSetting: 'fullSizeEditor',
 }
 
 type JoplinThemePref = 'light' | 'dark' | 'auto';
@@ -56,6 +57,14 @@ const registerSettings = async (): Promise<void> => {
       label: "Keep each drawing's saved theme",
       description: 'When off, existing drawings also open using the "Theme for new drawings" setting.',
     },
+    [Config.FullSizeSetting]: {
+      value: true,
+      type: SettingItemType.Bool,
+      section: Config.SettingsSection,
+      public: true,
+      label: 'Open the editor full size',
+      description: "Expand the drawing editor to the whole Joplin window. The button in the editor's top-right corner toggles it, and the last choice is remembered.",
+    },
   });
 }
 
@@ -79,16 +88,44 @@ const preserveDrawingTheme = async (): Promise<boolean> => {
   }
 }
 
+// Whether the editor opens stretched over the whole Joplin window. The editor
+// itself can toggle this while it is open; rememberFullSize() stores the result.
+const fullSizeEditor = async (): Promise<boolean> => {
+  try {
+    return (await joplin.settings.value(Config.FullSizeSetting)) !== false;
+  } catch (error) {
+    return true;
+  }
+}
+
+// Joplin collects the dialog's form data for whichever button closed it — every
+// button's onClick calls formData() in UserWebviewDialog.tsx — so the size the
+// user left the editor in is remembered even when the drawing is not saved.
+const rememberFullSize = async (dialogResult: any, previous: boolean): Promise<void> => {
+  const value = dialogResult?.formData?.main?.excalidraw_full_size;
+  if (value !== 'true' && value !== 'false' && value !== true && value !== false) return;
+
+  const chosen = (value === 'true' || value === true);
+  if (chosen === previous) return;
+
+  try {
+    await joplin.settings.setValue(Config.FullSizeSetting, chosen);
+  } catch (error) {
+    console.warn('excalidraw: could not remember the editor size:', error);
+  }
+}
+
 const escapeAttribute = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
-const buildDialogHTML = (diagramBody: string, theme: JoplinThemePref, preserveTheme: boolean): string => {
+const buildDialogHTML = (diagramBody: string, theme: JoplinThemePref, preserveTheme: boolean, fullSize: boolean): string => {
   return `
 		<form name="main" style="display:none">
 			<input type="hidden" name="excalidraw_diagram_json" id="excalidraw_diagram_json" value="${escapeAttribute(diagramBody)}">
 			<input type="hidden" name="excalidraw_diagram_svg" id="excalidraw_diagram_svg" value="">
 			<input type="hidden" name="excalidraw_theme" id="excalidraw_theme" value="${theme}">
 			<input type="hidden" name="excalidraw_preserve_theme" id="excalidraw_preserve_theme" value="${preserveTheme}">
+			<input type="hidden" name="excalidraw_full_size" id="excalidraw_full_size" value="${fullSize}">
 		</form>
 		`
 }
@@ -102,6 +139,7 @@ const openDialog = async (svgResourceId: string = null): Promise<string | null> 
   const appPath = await joplin.plugins.installationDir();
   const theme = await newDrawingThemePref();
   const preserveTheme = await preserveDrawingTheme();
+  const fullSize = await fullSizeEditor();
 
   const isNewDiagram = (svgResourceId === null);
   if (!isNewDiagram) {
@@ -112,7 +150,7 @@ const openDialog = async (svgResourceId: string = null): Promise<string | null> 
   let dialogs = joplin.views.dialogs;
   let dialogHandle = await dialogs.create(`excalidraw-dialog-${uuidv4()}`);
 
-  let header = buildDialogHTML(diagramBody, theme, preserveTheme);
+  let header = buildDialogHTML(diagramBody, theme, preserveTheme, fullSize);
   let iframe = `<iframe id="excalidraw_iframe" style="position:absolute;border:0;width:100%;height:100%;" src="${appPath}/local-excalidraw/index.html" title="Excalidraw frame"></iframe>`
 
   await dialogs.setHtml(dialogHandle, header + iframe);
@@ -123,6 +161,8 @@ const openDialog = async (svgResourceId: string = null): Promise<string | null> 
   await dialogs.setFitToContent(dialogHandle, false);
 
   let dialogResult = await dialogs.open(dialogHandle);
+  await rememberFullSize(dialogResult, fullSize);
+
   if (dialogResult.id === 'ok') {
     if (isNewDiagram) {
       let diagramJson = dialogResult.formData.main.excalidraw_diagram_json;

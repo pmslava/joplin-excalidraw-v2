@@ -43,3 +43,39 @@ body,
     border: none;
     color: var(--button-color, var(--color-on-surface));
 }
+/* Full-size toggle, rendered through renderTopRightUI next to the Library
+   button. Shaped like Excalidraw's own .help-icon / .sidebar-trigger buttons,
+   reusing its variables, so it sits naturally beside them in both themes. */
+.excalidraw .excalidraw-full-size-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: var(--lg-button-size);
+    height: var(--lg-button-size);
+    padding: 0.625rem;
+    border: none;
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 0 0 1px var(--color-surface-lowest);
+    background-color: var(--color-surface-low);
+    color: var(--button-color, var(--color-on-surface));
+    font-family: var(--ui-font);
+    cursor: pointer;
+}
+
+.excalidraw .excalidraw-full-size-button svg {
+    width: var(--lg-icon-size);
+    height: var(--lg-icon-size);
+}
+
+.excalidraw .excalidraw-full-size-button:hover {
+    background-color: var(--button-hover-bg, var(--island-bg-color));
+}
+
+.excalidraw .excalidraw-full-size-button:active {
+    background-color: var(--button-active-bg, var(--island-bg-color));
+}
+
+.excalidraw .excalidraw-full-size-button:focus-visible {
+    box-shadow: 0 0 0 2px var(--focus-highlight-color);
+}

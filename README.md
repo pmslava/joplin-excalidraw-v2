@@ -16,6 +16,11 @@
   drawing.
 - **Tools → Excalidraw** groups both commands (*Add Excalidraw drawing*, *Edit Excalidraw
   drawing*) in one submenu.
+- **Full size.** The button in the editor's top-right corner, next to *Library*, expands the
+  editor to the whole Joplin window and back — no margin round the drawing, and **Save** and
+  **Close** float over the canvas instead of sitting in a band below it. The last choice is
+  remembered, and the *Open the editor full size* setting (on by default) decides how the editor
+  opens the first time.
 - **Light and dark theme.** The editor follows Joplin's own theme by default. Two settings under
   **Tools → Options → Excalidraw**:
   - *Theme for new drawings* — Follow Joplin theme (default), Light, or Dark.
@@ -61,8 +66,8 @@ by neagix, which is no longer maintained (last commit October 2025), itself a fo
   once and save to get a real one. The original v1 resource is left untouched, so other notes
   referencing it are unaffected.
 - **Settings start at their defaults.** Joplin stores plugin settings under the plugin's id, so
-  the new id starts fresh: *Follow Joplin theme* and *Keep each drawing's saved theme*. Two
-  settings, ten seconds to redo.
+  the new id starts fresh: *Follow Joplin theme*, *Keep each drawing's saved theme* and *Open the
+  editor full size*. Three settings, ten seconds to redo.
 
 ## Notes & credits
 

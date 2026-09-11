@@ -7,6 +7,8 @@ First release as **Excalidraw** (`io.github.pmslava.excalidraw`), the continuati
 
 - Excalidraw 0.18.1
 - Fixed the text tool and the hand-drawn font in exported SVGs
+- Full-size toggle in the editor: expand the dialog to the whole Joplin window, with Save and
+  Close floating over the canvas
 - Light and dark theme support, with settings for new drawings and for keeping each drawing's
   saved theme
 - Tools > Excalidraw submenu grouping the Add and Edit commands
