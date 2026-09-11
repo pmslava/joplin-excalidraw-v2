@@ -15,6 +15,7 @@ First release as **Excalidraw** (`io.github.pmslava.excalidraw`), the continuati
 - Edit a drawing from the Markdown editor: right-click menu and the cursor's current line
 - Drawings refresh in place after saving, instead of showing a stale preview
 - Edit button now works in the Rich Text editor
+- "Mermaid to Excalidraw" works again: opening it no longer crashes the editor (upstream #3)
 - New plugin id and renamed internal identifiers (content scripts, commands, CSS classes, temp
   folder) so the plugin no longer collides with joplin-excalidraw-v2
 

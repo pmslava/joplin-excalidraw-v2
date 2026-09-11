@@ -6,6 +6,36 @@ import "@excalidraw/excalidraw/index.css";
 import "./style.css";
 import svgElementToString from '../util/svgElementToString'
 
+// --- React 17 / Excalidraw 0.18 ---------------------------------------------
+// Excalidraw 0.18's "Mermaid to Excalidraw" dialog imports useDeferredValue,
+// a React 18 hook, with no fallback (unlike useTransition, which it guards).
+// This plugin bundles React 17, so opening that dialog throws
+// "useDeferredValue is not a function" and tears the whole editor down.
+// React 17 has no concurrent rendering, so the hook is the identity function.
+const identity = (value: any): any => value;
+
+const installUseDeferredValue = (): void => {
+  // The `import * as React` namespace exposes read-only getters onto the
+  // CommonJS module the bundler wraps; `default` is that module itself, and
+  // that is the object Excalidraw's own import reads through. Patch it first,
+  // then confirm the hook is visible through the namespace we share with it.
+  for (const target of [(React as any).default, React as any]) {
+    if (!target || typeof target.useState !== 'function') continue;
+    if (typeof target.useDeferredValue === 'function') return;
+    try {
+      target.useDeferredValue = identity;
+    } catch (error) {
+      try {
+        Object.defineProperty(target, 'useDeferredValue', { value: identity, configurable: true });
+      } catch (nested) { /* frozen namespace, try the next candidate */ }
+    }
+    if (typeof (React as any).useDeferredValue === 'function') return;
+  }
+  console.warn('excalidraw: could not add React.useDeferredValue; the Mermaid importer may fail.');
+};
+
+installUseDeferredValue();
+
 // The dialog hands the existing drawing to this iframe, and reads the result
 // back, through hidden inputs in the parent (dialog) document.
 const parentInput = (id: string): HTMLInputElement | null =>
