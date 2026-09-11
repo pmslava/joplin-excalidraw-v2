@@ -2,7 +2,9 @@ import joplin from 'api'
 import { v4 as uuidv4 } from 'uuid';
 
 import { ContentScriptType, MenuItemLocation, SettingItemType, ToolbarButtonLocation } from 'api/types'
-import { createDiagramResource, getDiagramResource, updateDiagramResource, clearDiskCache, duplicateV1DiagramAsV2, generateId } from './resources';
+import { createDiagramResource, getDiagramResource, updateDiagramResource, clearDiskCache, duplicateV1DiagramAsV2, generateId, readDiagramSvg } from './resources';
+import { svgToPngDataUrl } from './util/svgToPng';
+import { excalidrawClipboardPayload } from './util/excalidrawClipboard';
 
 const Config = {
   ContentScriptId: 'io.github.pmslava.excalidraw.markdownIt',
@@ -238,6 +240,135 @@ const findExcalidrawForEditing = async (): Promise<string | null> => {
   return null;
 }
 
+// showToast() was added to the plugin API after the api/ typings vendored in
+// this repository were generated, so it is called dynamically. Signature at
+// Joplin v3.7.16 (packages/lib/services/plugins/api/JoplinViewsDialogs.ts:81 and
+// types.ts): showToast(toast: { message: string; type?: ToastType; duration?:
+// number; timestamp?: number }), with ToastType.Success === 'success'. On an
+// older Joplin the call simply does nothing.
+const showToast = async (message: string): Promise<void> => {
+  try {
+    await (joplin.views.dialogs as any).showToast({ message, type: 'success', duration: 2500 });
+  } catch (error) {
+    console.info('excalidraw:', message);
+  }
+}
+
+// Drawings that currently have an editor dialog open, by SVG resource id. Two
+// editors on one drawing would both write the same resource pair on save, last
+// write silently winning — so the second request is refused.
+//
+// CAVEAT: if the user closes a *window* that holds an open dialog with its
+// title-bar button, Joplin never settles that dialog's open() promise (nothing
+// calls WebviewController.setOpen(false) on WINDOW_CLOSE), the unsaved changes
+// are lost silently, and the `finally` below never runs — so that drawing stays
+// marked as open until Joplin restarts. Closing with the editor's own Close
+// button (or Escape) is the clean path.
+const openDrawings = new Set<string>();
+
+const openDrawingDialog = async (svgResourceId: string): Promise<string | null> => {
+  if (openDrawings.has(svgResourceId)) {
+    await joplin.views.dialogs.showMessageBox('This Excalidraw drawing is already open in an editor.');
+    return null;
+  }
+
+  openDrawings.add(svgResourceId);
+  try {
+    return await openDialog(svgResourceId);
+  } finally {
+    openDrawings.delete(svgResourceId);
+  }
+}
+
+// One-shot waiters resolved by the single onNoteSelectionChange listener that is
+// registered at onStart. A listener *per call* would leak:
+// JoplinWorkspace.onNoteSelectionChange returns an empty Disposable and only
+// unregisters on plugin unload (laurent22/joplin#14919).
+const noteSelectionWaiters = new Set<() => void>();
+
+const waitForNextNoteSelectionChange = (timeoutMs: number): Promise<void> => {
+  return new Promise<void>(resolve => {
+    const waiter = () => {
+      clearTimeout(timer);
+      noteSelectionWaiters.delete(waiter);
+      resolve();
+    };
+    const timer = setTimeout(waiter, timeoutMs);
+    noteSelectionWaiters.add(waiter);
+  });
+}
+
+// Open a drawing in a second Joplin window, so the note and the drawing can be
+// worked on side by side. Existing drawings only: a new drawing has to insert
+// markdown into the note body, and if the first window has unsaved edits it
+// would later overwrite that insertion (Joplin saves whole note bodies).
+//
+// dialogs.open() renders the dialog in whichever window has focus at that
+// instant, and openNoteInNewWindow only dispatches WINDOW_OPEN — the focus swap
+// comes back asynchronously through a main-process IPC round trip. The only
+// proxy a plugin can observe for it is onNoteSelectionChange, which fires on
+// WINDOW_FOCUS; hence wait for that, then let the new window's portal mount.
+const editInNewWindow = async (svgResourceId: string): Promise<string | null> => {
+  if (openDrawings.has(svgResourceId)) {
+    await joplin.views.dialogs.showMessageBox('This Excalidraw drawing is already open in an editor.');
+    return null;
+  }
+
+  let openedWindow = false;
+  try {
+    const note = await joplin.workspace.selectedNote();
+    if (note?.id) {
+      await joplin.commands.execute('openNoteInNewWindow', note.id);
+      openedWindow = true;
+    }
+  } catch (error) {
+    // Older Joplin versions have no openNoteInNewWindow; fall back to editing
+    // in this window rather than doing nothing.
+    console.warn('excalidraw: could not open the note in a new window:', error);
+  }
+
+  if (openedWindow) {
+    await waitForNextNoteSelectionChange(1500);
+    await new Promise(resolve => setTimeout(resolve, 150));
+  }
+
+  return openDrawingDialog(svgResourceId);
+}
+
+const copyDrawingAsImage = async (svgResourceId: string): Promise<void> => {
+  try {
+    const dataUrl = await svgToPngDataUrl(await readDiagramSvg(svgResourceId));
+    await joplin.clipboard.writeImage(dataUrl);
+    await showToast('Copied as PNG');
+  } catch (error) {
+    console.error('excalidraw: could not copy the drawing as an image:', error);
+    await joplin.views.dialogs.showMessageBox('Could not copy this Excalidraw drawing as an image.');
+  }
+}
+
+const copyDrawingAsExcalidraw = async (svgResourceId: string): Promise<void> => {
+  try {
+    const { dataJson } = await getDiagramResource(svgResourceId);
+    await joplin.clipboard.writeText(excalidrawClipboardPayload(dataJson));
+    await showToast('Copied as Excalidraw');
+  } catch (error) {
+    console.error('excalidraw: could not copy the drawing as Excalidraw:', error);
+    await joplin.views.dialogs.showMessageBox('Could not copy this Excalidraw drawing as Excalidraw elements.');
+  }
+}
+
+// The SVG resource id inside a message from the viewer: either an image src
+// (file:// or joplin-content://) or a plain resource link.
+const svgResourceIdFromMessage = (text: string): string | null => {
+  const fileURLMatch = /^(?:file|joplin[-a-z]+):\/\/.*\/([a-zA-Z0-9]+)[.]\w+(?:[?#]|$)/.exec(text);
+  if (fileURLMatch) return fileURLMatch[1];
+
+  const resourceLinkMatch = /^:\/([a-zA-Z0-9]+)$/.exec(text);
+  if (resourceLinkMatch) return resourceLinkMatch[1];
+
+  return null;
+}
+
 joplin.plugins.register({
   onStart: async () => {
 
@@ -263,12 +394,37 @@ joplin.plugins.register({
       './contentScripts/codeMirror.js',
     );
 
+    // One listener for the whole plugin, resolving whatever one-shot waiters are
+    // pending (see waitForNextNoteSelectionChange).
+    await joplin.workspace.onNoteSelectionChange(() => {
+      const waiters = Array.from(noteSelectionWaiters);
+      noteSelectionWaiters.clear();
+      waiters.forEach(waiter => waiter());
+    });
+
     // this is the main message processing function
     await joplin.contentScripts.onMessage(Config.ContentScriptId, async (message: any) => {
       // decode message
       message = decodeURIComponent(message)
 
       let svgResourceId: string | null = null;
+
+      // The viewer's toolbar buttons other than Edit prefix the image src; Edit
+      // keeps sending the bare src, as it always has.
+      for (const [prefix, action] of [
+        ['excalidraw_new_window_', editInNewWindow],
+        ['excalidraw_copy_image_', copyDrawingAsImage],
+        ['excalidraw_copy_excalidraw_', copyDrawingAsExcalidraw],
+      ] as [string, (id: string) => Promise<unknown>][]) {
+        if (!message.startsWith(prefix)) continue;
+
+        svgResourceId = svgResourceIdFromMessage(message.slice(prefix.length));
+        if (svgResourceId === null) {
+          console.error('could not parse SVG resource id from:', message);
+          return null;
+        }
+        return (await action(svgResourceId)) ?? null;
+      }
 
       if (message.startsWith("convert_v1_")) {
         const jsonResourceId = message.slice("convert_v1_".length);
@@ -293,14 +449,7 @@ joplin.plugins.register({
         return svgResourceId;
       } else {
         // Extract the ID
-        const fileURLMatch = /^(?:file|joplin[-a-z]+):\/\/.*\/([a-zA-Z0-9]+)[.]\w+(?:[?#]|$)/.exec(message);
-        const resourceLinkMatch = /^:\/([a-zA-Z0-9]+)$/.exec(message);
-
-        if (fileURLMatch) {
-          svgResourceId = fileURLMatch[1];
-        } else if (resourceLinkMatch) {
-          svgResourceId = resourceLinkMatch[1];
-        }
+        svgResourceId = svgResourceIdFromMessage(message);
       }
 
       if (svgResourceId === null) {
@@ -309,7 +458,7 @@ joplin.plugins.register({
         return null;
       }
 
-      return openDialog(svgResourceId);
+      return openDrawingDialog(svgResourceId);
     });
 
     await joplin.commands.register({
@@ -328,25 +477,61 @@ joplin.plugins.register({
       iconName: 'icon-excalidraw-plus-icon-filled',
       execute: async () => {
         const svgResourceId = await findExcalidrawForEditing();
-        return svgResourceId ? openDialog(svgResourceId) : null;
+        return svgResourceId ? openDrawingDialog(svgResourceId) : null;
+      }
+    });
+
+    await joplin.commands.register({
+      name: 'excalidraw.editInNewWindow',
+      label: 'Edit Excalidraw drawing in new window',
+      iconName: 'icon-excalidraw-plus-icon-filled',
+      execute: async () => {
+        const svgResourceId = await findExcalidrawForEditing();
+        return svgResourceId ? editInNewWindow(svgResourceId) : null;
+      }
+    });
+
+    await joplin.commands.register({
+      name: 'excalidraw.copyImage',
+      label: 'Copy Excalidraw drawing as image',
+      iconName: 'fas fa-image',
+      execute: async () => {
+        const svgResourceId = await findExcalidrawForEditing();
+        if (svgResourceId) await copyDrawingAsImage(svgResourceId);
+      }
+    });
+
+    await joplin.commands.register({
+      name: 'excalidraw.copyExcalidraw',
+      label: 'Copy Excalidraw drawing as Excalidraw',
+      iconName: 'fas fa-code',
+      execute: async () => {
+        const svgResourceId = await findExcalidrawForEditing();
+        if (svgResourceId) await copyDrawingAsExcalidraw(svgResourceId);
       }
     });
 
     await joplin.views.toolbarButtons.create('excalidraw.add', 'excalidraw.add', ToolbarButtonLocation.EditorToolbar);
 
-    // Group both commands under a single Tools > Excalidraw submenu.
+    // Group every command under a single Tools > Excalidraw submenu.
     await joplin.views.menus.create('excalidrawMenu', 'Excalidraw', [
       { commandName: 'excalidraw.add' },
       { commandName: 'excalidraw.edit' },
+      { commandName: 'excalidraw.editInNewWindow' },
+      { commandName: 'excalidraw.copyImage' },
+      { commandName: 'excalidraw.copyExcalidraw' },
     ], MenuItemLocation.Tools);
 
-    // Offer "Edit Excalidraw drawing" in the editor's right-click menu, but only
-    // when the cursor's current line actually holds a drawing.
+    // Offer the drawing actions in the editor's right-click menu, but only when
+    // the cursor's current line actually holds a drawing.
     joplin.workspace.filterEditorContextMenu(async (contextMenu: any) => {
       if (excalidrawSvgIds(await editorCurrentLine()).length > 0) {
         contextMenu.items.push(
           { type: 'separator' },
           { commandName: 'excalidraw.edit', label: 'Edit Excalidraw drawing' },
+          { commandName: 'excalidraw.editInNewWindow', label: 'Edit Excalidraw drawing in new window' },
+          { commandName: 'excalidraw.copyImage', label: 'Copy Excalidraw drawing as image' },
+          { commandName: 'excalidraw.copyExcalidraw', label: 'Copy Excalidraw drawing as Excalidraw' },
         );
       }
       return contextMenu;

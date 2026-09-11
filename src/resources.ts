@@ -85,6 +85,14 @@ export async function getDiagramResource(resourceId: string): Promise<{ body: st
     }
 }
 
+// The rendered SVG of a drawing, read straight off disk: a Joplin resource is a
+// file, and joplin.data.resourcePath() gives its path. (joplin.data.get(['resources',
+// id, 'file']) would work too but hands back a byte array to re-decode.)
+export async function readDiagramSvg(svgResourceId: string): Promise<string> {
+    const path = await joplin.data.resourcePath(svgResourceId);
+    return fs.readFile(path, 'utf-8');
+}
+
 export async function updateDiagramResource(svgResourceId:string, dataJson:string, dataSvg: string): Promise<string> {
     // get the title from the SVG resource, which contains the JSON resource id
     let resourceData = await joplin.data.get(['resources', svgResourceId], { fields: ['id', 'title'] });
