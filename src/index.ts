@@ -38,7 +38,7 @@ const joplinThemePref = async (): Promise<JoplinThemePref> => {
 const registerSettings = async (): Promise<void> => {
   await joplin.settings.registerSection(Config.SettingsSection, {
     label: 'Excalidraw',
-    iconName: 'fas fa-pencil-alt',
+    iconName: 'excalidraw-plugin-icon',
   });
 
   await joplin.settings.registerSettings({
@@ -464,7 +464,7 @@ joplin.plugins.register({
     await joplin.commands.register({
       name: 'excalidraw.add',
       label: 'Add Excalidraw drawing',
-      iconName: 'icon-excalidraw-plus-icon-filled',
+      iconName: 'excalidraw-plugin-icon',
       execute: async () => {
         // return as promise
         return openDialog();
@@ -474,7 +474,7 @@ joplin.plugins.register({
     await joplin.commands.register({
       name: 'excalidraw.edit',
       label: 'Edit Excalidraw drawing',
-      iconName: 'icon-excalidraw-plus-icon-filled',
+      iconName: 'excalidraw-plugin-icon',
       execute: async () => {
         const svgResourceId = await findExcalidrawForEditing();
         return svgResourceId ? openDrawingDialog(svgResourceId) : null;
@@ -484,7 +484,7 @@ joplin.plugins.register({
     await joplin.commands.register({
       name: 'excalidraw.editInNewWindow',
       label: 'Edit Excalidraw drawing in new window',
-      iconName: 'icon-excalidraw-plus-icon-filled',
+      iconName: 'excalidraw-plugin-icon',
       execute: async () => {
         const svgResourceId = await findExcalidrawForEditing();
         return svgResourceId ? editInNewWindow(svgResourceId) : null;

@@ -2,6 +2,8 @@
 
 ## 3.0.2
 
+- The toolbar button and the settings entry now show Excalidraw's own logo mark instead of the
+  old plugin's pen glyph
 - The hover toolbar's dark/light detection now waits for the note's theme to be applied and
   re-checks whenever the toolbar is shown; in 3.0.1 it could still come out white in dark themes
 
